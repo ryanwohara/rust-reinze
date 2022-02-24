@@ -60,7 +60,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         let num = NumberFormat::new();
 
                         // There are currently 81,203 OSRS players (68.88%) and 36,687 RS3 players (31.12%) online. (Total: 117,890) (Total Registered Accounts: 296,907,582)
-                        client.send_privmsg(target, format!("There are currently {} OSRS players ({}%) and {} RS3 players ({}%) online. (Total: {}) (Total Registered Accounts: {})", osrs_players, num.format(".2f", get_int(osrs_players) / total_players * 100.0), rs3_players, num.format(".2f", rs3_players / total_players * 100.0), num.format(",d", total_players), total_registered))?;
+                        client.send_privmsg(target, format!("There are currently {} OSRS players ({}%) and {} RS3 players ({}%) online. (Total: {}) (Total Registered Accounts: {})", osrs_players, num.format(".2f", get_int(osrs_players) / total_players * 100.0), num.format(",d", rs3_players), num.format(".2f", rs3_players / total_players * 100.0), num.format(",d", total_players), total_registered))?;
                     }
                 }
             }
