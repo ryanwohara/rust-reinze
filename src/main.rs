@@ -70,11 +70,18 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn get_url(url: &str) -> Result<String, reqwest::Error> {
+async fn curl(url: &str) -> Result<String, reqwest::Error> {
     Ok(reqwest::get(url).await?.text().await?)
+}
+
+async fn get_url(url: &str) -> Result<String, reqwest::Error> {
+    match curl(url).await {
+        Ok(s) => Ok(s),
+        Err(e) => Ok(e.to_string()),
+    }
 }
 
 fn get_int(string: &str) -> f32 {
     // Strip commas and convert to a float
-    return string.replace(",", "").parse::<f32>().unwrap();
+    return string.replace(",", "").parse::<f32>().unwrap_or(0.0);
 }
