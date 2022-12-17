@@ -11,6 +11,8 @@ format_num = "0.1.0"
 futures = "0.3.21"
 irc = "0.15.0"
 regex = "1.5.4"
-reqwest = "0.11.9"
+reqwest = { version = "0.11", features = ["json"] }
+select = "0.6.0"
+serde = { version = "1.0.130", features = ["derive"] }
 substring = "1.4.5"
-tokio = { version = "1.0.0", features = ["rt", "rt-multi-thread", "macros", "net", "time"] }
+tokio = { version = "1", features = ["full"] }

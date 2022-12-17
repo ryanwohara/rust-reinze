@@ -1,8 +1,17 @@
+extern crate reqwest;
+extern crate select;
+
 use anyhow::Result;
 use format_num::NumberFormat;
 use futures::prelude::*;
 use irc::client::prelude::*;
 use regex::Regex;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct TotalRsPlayers {
+    accounts: f32,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -32,7 +41,19 @@ async fn main() -> Result<(), anyhow::Error> {
                     if cmd.eq("ping") {
                         client.send_privmsg(target, "pong!")?;
                     } else if cmd.eq("players") {
-                        client = players(client, target).await?;
+                        match players().await {
+                            Ok(message) => {
+                                match client.send_privmsg(target, message) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        println!("Error sending message: {}", e);
+                                    }
+                                };
+                            }
+                            Err(_) => {
+                                client.send_privmsg(target, "Error getting player count")?;
+                            }
+                        };
                     }
                 }
             }
@@ -42,54 +63,120 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn players(client: Client, target: &str) -> Result<Client, anyhow::Error> {
-    let rs3resp = get_url("https://www.runescape.com/player_count.js?varname=iPlayerCount&callback=jQuery36006339226594951519_1645569829067&_=1645569829068").await;
-    let osrsresp = get_url("https://oldschool.runescape.com").await;
+async fn players() -> Result<String, ()> {
+    let total_players = match get_rs3_players().await {
+        Ok(resp) => resp,
+        Err(_) => return Err(()),
+    };
+    let osrs_players = match get_osrs_players().await {
+        Ok(resp) => resp,
+        Err(_) => return Err(()),
+    };
 
-    // Remove the last two characters
-    let mut rs3string = rs3resp?;
-    rs3string.pop();
-    rs3string.pop();
+    let rs3_players = total_players - osrs_players;
 
-    let total_players = get_int(rs3string.split("(").nth(1).unwrap());
-
-    let osrs_string = osrsresp?;
-    let osrs_re =
-        Regex::new(r"<p class='player-count'>There are currently ([\d,]+) people playing!</p>")
-            .unwrap();
-    let matched = osrs_re.captures(&osrs_string);
-    let osrs_players = matched.unwrap().get(1).unwrap().as_str();
-    let rs3_players = total_players - get_int(osrs_players);
-
-    let totalresp = get_url("https://secure.runescape.com/m=account-creation-reports/rsusertotal.ws?callback=jQuery36004266025351340994_1645574453620&_=1645574453621").await;
-    let mut totalstring = totalresp?;
-    // Remove the last four characters
-    totalstring.pop();
-    totalstring.pop();
-    totalstring.pop();
-    totalstring.pop();
-    let total_registered = totalstring.split("\"").nth(5).unwrap();
+    let total_registered = match get_total_players().await {
+        Ok(resp) => resp,
+        Err(_) => return Err(()),
+    };
 
     let num = NumberFormat::new();
 
     // There are currently 81,203 OSRS players (68.88%) and 36,687 RS3 players (31.12%) online. (Total: 117,890) (Total Registered Accounts: 296,907,582)
-    client.send_privmsg(target, format!("There are currently {} OSRS players ({}%) and {} RS3 players ({}%) online. (Total: {}) (Total Registered Accounts: {})", osrs_players, num.format(".2f", get_int(osrs_players) / total_players * 100.0), num.format(",d", rs3_players), num.format(".2f", rs3_players / total_players * 100.0), num.format(",d", total_players), total_registered))?;
+    let string = format!("There are currently {} OSRS players ({}%) and {} RS3 players ({}%) online. (Total: {}) (Total Registered Accounts: {})", 
+            num.format(",d", osrs_players), num.format(".2f", osrs_players / total_players * 100.0), 
+            num.format(",d", rs3_players), num.format(".2f", rs3_players / total_players * 100.0), 
+            num.format(",d", total_players), total_registered);
 
-    Ok(client)
+    Ok(string)
 }
 
-async fn curl(url: &str) -> Result<String, reqwest::Error> {
-    Ok(reqwest::get(url).await?.text().await?)
+async fn get_rs3_players() -> Result<f32, ()> {
+    let resp = match reqwest::get("https://www.runescape.com/player_count.js?varname=iPlayerCount&callback=jQuery36006339226594951519_1645569829067&_=1645569829068").await {
+        Ok(resp) => resp,
+        Err(e) => {
+            println!("Error making HTTP request: {}", e);
+        return Err(())
+        },
+    };
+
+    let mut string = match resp.text().await {
+        Ok(string) => string,
+        Err(e) => {
+            println!("Error getting text: {}", e);
+            return Err(());
+        }
+    };
+
+    // Remove the last two characters
+    string.pop();
+    string.pop();
+
+    // Remove the first two characters
+    let string = string.split("(").nth(1).unwrap();
+
+    // Strip commas and convert to a float
+    Ok(get_int(string))
 }
 
-async fn get_url(url: &str) -> Result<String, reqwest::Error> {
-    match curl(url).await {
-        Ok(s) => Ok(s),
-        Err(e) => Ok(e.to_string()),
-    }
+async fn get_osrs_players() -> Result<f32, ()> {
+    let resp = match reqwest::get("https://oldschool.runescape.com").await {
+        Ok(resp) => resp,
+        Err(e) => {
+            println!("Error making HTTP request: {}", e);
+            return Err(());
+        }
+    };
+
+    let string = match resp.text().await {
+        Ok(string) => string,
+        Err(e) => {
+            println!("Error getting text: {}", e);
+            return Err(());
+        }
+    };
+
+    let re = match Regex::new(
+        r"<p class='player-count'>There are currently ([\d,]+) people playing!</p>",
+    ) {
+        Ok(re) => re,
+        Err(e) => {
+            println!("Error creating regex: {}", e);
+            return Err(());
+        }
+    };
+    let matched = re.captures(&string);
+    let string = matched.unwrap().get(1).unwrap().as_str();
+
+    // Strip commas and convert to a float
+    Ok(get_int(string))
+}
+
+async fn get_total_players() -> Result<f32, ()> {
+    let resp = match reqwest::get(
+        "https://secure.runescape.com/m=account-creation-reports/rsusertotal.ws",
+    )
+    .await
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            println!("Error making HTTP request: {}", e);
+            return Err(());
+        }
+    };
+
+    let totaljson: TotalRsPlayers = match resp.json::<TotalRsPlayers>().await {
+        Ok(totaljson) => totaljson,
+        Err(e) => {
+            println!("Error getting json: {}", e);
+            return Err(());
+        }
+    };
+
+    Ok(totaljson.accounts)
 }
 
 fn get_int(string: &str) -> f32 {
     // Strip commas and convert to a float
-    return string.replace(",", "").parse::<f32>().unwrap_or(0.0);
+    string.replace(",", "").parse::<f32>().unwrap_or(0.0)
 }
