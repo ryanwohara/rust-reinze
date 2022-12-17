@@ -21,6 +21,8 @@ pub async fn players() -> Result<String, ()> {
         Err(_) => return Err(()),
     };
 
+    // Jagex is ashamed of their RS3 player count. The RS3 site only shows the total number of players,
+    // so we have to subtract the OSRS player count from the total to get the RS3 player count.
     let rs3_players = total_players - osrs_players;
 
     let total_registered = match get_total_players().await {
@@ -41,6 +43,8 @@ pub async fn players() -> Result<String, ()> {
 }
 
 async fn get_rs3_players() -> Result<f32, ()> {
+    // Fetch this weird jQuery callback thing. Looks like this:
+    // jQuery36006339226594951519_1645569829067(127551);
     let resp = match reqwest::get("https://www.runescape.com/player_count.js?varname=iPlayerCount&callback=jQuery36006339226594951519_1645569829067&_=1645569829068").await {
         Ok(resp) => resp,
         Err(e) => {
@@ -62,13 +66,20 @@ async fn get_rs3_players() -> Result<f32, ()> {
     string.pop();
 
     // Remove the first two characters
-    let string = string.split("(").nth(1).unwrap();
+    let string = match string.split("(").nth(1) {
+        Some(string) => string,
+        None => {
+            println!("Error splitting string");
+            return Err(());
+        }
+    };
 
     // Strip commas and convert to a float
     Ok(get_int(string))
 }
 
 async fn get_osrs_players() -> Result<f32, ()> {
+    // Fetch the entire OSRS website to parse out the player count
     let resp = match reqwest::get("https://oldschool.runescape.com").await {
         Ok(resp) => resp,
         Err(e) => {
@@ -102,6 +113,7 @@ async fn get_osrs_players() -> Result<f32, ()> {
 }
 
 async fn get_total_players() -> Result<f32, ()> {
+    // Fetch some JSON from the Runescape website
     let resp = match reqwest::get(
         "https://secure.runescape.com/m=account-creation-reports/rsusertotal.ws",
     )
