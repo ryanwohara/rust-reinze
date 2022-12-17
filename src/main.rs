@@ -33,22 +33,26 @@ async fn main() -> Result<(), anyhow::Error> {
                 if matched.is_some() {
                     let cmd = matched.unwrap().get(1).unwrap().as_str();
 
-                    if cmd.eq("ping") {
-                        client.send_privmsg(target, "pong!")?;
-                    } else if cmd.eq("players") {
-                        match runescape::players().await {
-                            Ok(message) => {
-                                match client.send_privmsg(target, message) {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        println!("Error sending message: {}", e);
-                                    }
-                                };
-                            }
-                            Err(_) => {
-                                client.send_privmsg(target, "Error getting player count")?;
-                            }
-                        };
+                    match cmd {
+                        "ping" => {
+                            client.send_privmsg(target, "pong!")?;
+                        }
+                        "players" => {
+                            match runescape::players().await {
+                                Ok(message) => {
+                                    match client.send_privmsg(target, message) {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            println!("Error sending message: {}", e);
+                                        }
+                                    };
+                                }
+                                Err(_) => {
+                                    client.send_privmsg(target, "Error getting player count")?;
+                                }
+                            };
+                        }
+                        _ => {}
                     }
                 }
             }
