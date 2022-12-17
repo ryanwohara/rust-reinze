@@ -35,7 +35,12 @@ async fn main() -> Result<(), anyhow::Error> {
 
                     match cmd {
                         "ping" => {
-                            client.send_privmsg(target, "pong!")?;
+                            match client.send_privmsg(target, "pong!") {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    println!("Error sending message: {}", e);
+                                }
+                            };
                         }
                         "players" => {
                             match runescape::players().await {
