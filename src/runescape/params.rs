@@ -22,15 +22,29 @@ pub async fn params(skill: &str, param: &str) -> Result<String, ()> {
 
     let underscored = param.replace(" ", "_");
 
-    let xp = match section.get(underscored) {
-        Some(xp) => xp,
-        None => {
-            println!("Error getting param: {}", param);
-            return Err(());
-        }
-    };
+    let mut output = format!("[{}]", capitalize(skill));
 
-    let output = format!("[{}] {}: {}xp", capitalize(skill), param, xp);
+    let mut found_params: Vec<String> = vec![];
+
+    for (k, v) in section.iter() {
+        if k.to_ascii_lowercase()
+            .contains(&underscored.to_ascii_lowercase())
+        {
+            found_params.push(format!("{}: {}xp", k.replace("_", " "), v.to_string()));
+        }
+
+        if found_params.len() >= 10 {
+            break;
+        }
+    }
+
+    if found_params.len() == 0 {
+        return Err(());
+    }
+
+    for param in found_params.iter() {
+        output = format!("{} {}", output, param);
+    }
 
     Ok(output)
 }
