@@ -1,0 +1,60 @@
+Potato~1~35~8~-~9~2 Buckets of Compost
+Onions~5~35~9.5~-~10.5~1 Sack of Potatoes
+Cabbage~7~35~10~-~11.5~1 Sack of Onions
+Tomatoes~12~35~12.5~-~14~2 Sacks of Cabbage
+Sweetcorn~20~55~17~-~19~10 Jute Fibres
+Strawberries~31~55~26~-~29~1 Basket of Apples
+Watermelon~47~75~48.5~-~54.5~10 Curry Leaves
+Snape Grass~61~75~82~-~82~5 Jangerberries
+Marigold~2~17.5~8.5~-~47
+Rosemary~11~17.5~12~-~66.5
+Nasturtium~24~17.5~19.5~-~111
+Woad~25~17.5~20.5~-~115.5
+Limpwurt Plant~26~17.5~21.5~-~120
+Redberry Bush~10~90~11.5~64~4.5~4 Sacks of Cabbage
+Cadavaberry Bush~22~110~18~102.5~7~3 Baskets of Tomatoes
+Dwellberry Bush~36~130~31.5~177.5~12~3 Baskets of Strawberries
+Jangerberry Bush~48~150~50.5~284.5~19~6 Watermelons
+Whiteberry Bush~59~150~78~437.5~29~8 Mushrooms
+Poison Ivy Bush~70~150~120~674~45
+Oak Tree~15~220~14~467.3~-~1 Basket of Tomatoes
+Willow Tree~30~220~25~1,456.3~-~1 Basket of Apples
+Maple Tree~45~300~45~3,403.4~-~1 Basket of Oranges
+Yew Tree~60~380~81~7,069.9~-~10 Cactus Spines
+Magic Tree~75~460~145.5~13,768.3~-~25 Coconuts
+Apple Tree~27~960~22~1,199.5~8.5~9 Raw Sweetcorn
+Banana Tree~33~960~28~1,750.5~10.5~4 Baskets of Apples
+Orange Tree~39~960~35.5~2,470.2~13.5~3 Baskets of Strawberries
+Curry Tree~42~960~40~2,906.9~15~5 Baskets of Bananas
+Pineapple Tree~51~960~57~4,605.7~21.5~10 Watermelons
+Papaya Tree~57~960~72~6,146.4~27~10 Pineapples
+Palm Tree~68~960~110.5~10,150.1~42~15 Papayas
+Barley~3~35~8.5~-~9.5~3 Buckets of Compost
+Hammerstone Hops~4~35~9~-~10~1 Bunch of Marigolds
+Asgarnian Hops~8~45~10.5~-~12~1 Sack of Onions
+Jute Plant~13~45~13~-~14.5~6 Handfuls of Barley Malt
+Yanillian Hops~16~55~14.5~-~16~1 Basket of Tomatoes
+Krandorian Hops~21~65~17.5~-~19.5~3 Sacks of Cabbage
+Wildblood Hops~28~75~23~-~26~1 Nasturtium
+Guam~9~75~11~-~12.5
+Marrentill~14~75~13.5~-~15
+Tarromin~19~75~16~-~18
+Harralander~26~75~21.5~-~24
+Goutweed~29~75~105~-~45
+Ranarr Weed~32~75~27~-~30.5
+Spirit Weed~36~75~32~-~36
+Toadflax~38~75~34~-~38.5
+Irit Leaf~44~75~43~-~48.5
+Avantoe~50~75~54.5~-~61.5
+Kwuarm~56~75~69~-~78
+Snapdragon~62~75~87.5~-~98.5
+Cadantine~67~75~106.5~-~120
+Lantadyme~73~75~134.5~-~151.5
+Dwarf Weed~79~75~170.5~-~192
+Torstol~85~75~199.5~-~224.5
+Evil Turnip~42~5~41~-~46
+Bittercap Mushroom~53~220~61.5~-~57.7
+Cactus~55~520~66.5~374~25
+Belladonna~63~320~91~-~512
+Calquat Tree~72~1200~129.5~12096~48.5~8 Poison ivy berries
+Spirit Tree~83~3680~199.5~19301.8~-~1 Ground Suqah tooth, 5 Monkey nuts, 1 Monkey bar

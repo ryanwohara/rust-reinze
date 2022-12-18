@@ -1,0 +1,43 @@
+Piscatoris Hunting Area: AKQ
+Woodlands Hunting Area: AKQ
+Pengin Island: AJS
+Miscellania: CIP
+Keldagrim: DKS
+Slayer Cave: AJR
+Sinclair Mansion: CJR
+Chasm of Fire: DJR
+McGrubor's Wood: ALS
+Legends Guild: BLR
+Unicorn Pen (Ardougne Zoo): BIS
+Necromancer: DJP
+Tree Gnome Maze (south): CIQ
+Hazelmere: CLS
+Chompy Frog Pond: BKP
+Great Kourend: CIS
+Abyss: ALR
+Abyssal Sire: DIP
+Feldip Hills: AKS
+Edgeville: DKR
+Wizard Tower: DIS
+Gorak Lair: DIR
+Enchanted Valley: BKQ
+Starflower Plane: CKP
+Mudskipper Point: AIQ
+Grail Castle: BJR
+TzHaar: BLP
+Karamja (south): DKP
+Cairn Isle: CKR
+Myreque Secret Passage: DLS
+Canifis Mushroom Patch (Slayer Tower): CKS
+Mort Myre Swamp: BKR
+Kharidian Desert (northwest): BIQ
+Kharidian Desert (southeast): DLQ
+Yu'buisk: BLQ
+Haunted Woods: ALQ
+Zulrah's Sacred Eels: BJS
+Port Tyras: BJS
+Zulrah's Audience Area: DLR
+Zeah: CIS
+Lighthouse: ALP
+Player Owned House: DIQ
+POH: DIQ
