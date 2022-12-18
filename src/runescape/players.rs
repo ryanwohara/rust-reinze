@@ -5,8 +5,9 @@ use anyhow::Result;
 use format_num::NumberFormat;
 use regex::Regex;
 use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Debug)]
 struct TotalRsPlayers {
     accounts: f32,
 }

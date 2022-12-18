@@ -41832,7 +41832,7 @@
     "id": 21880,
     "members": true,
     "lowalch": 200,
-    "limit": 15000,
+    "limit": 25000,
     "value": 500,
     "highalch": 300,
     "icon": "Wrath rune.png",

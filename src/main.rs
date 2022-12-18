@@ -1,5 +1,5 @@
 pub mod common;
-mod runescape;
+pub mod runescape;
 
 extern crate reqwest;
 extern crate select;
@@ -84,6 +84,26 @@ async fn main() -> Result<(), anyhow::Error> {
                                 }
                                 Err(_) => {
                                     client.send_privmsg(target, "Error getting params")?;
+                                }
+                            };
+                        }
+                        "price" => {
+                            if param.is_empty() {
+                                client.send_privmsg(target, "Invalid number of arguments")?;
+                                continue;
+                            }
+
+                            match runescape::prices(param).await {
+                                Ok(message) => {
+                                    match client.send_privmsg(target, message) {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            println!("Error sending message: {}", e);
+                                        }
+                                    };
+                                }
+                                Err(_) => {
+                                    client.send_privmsg(target, "Error getting price")?;
                                 }
                             };
                         }
