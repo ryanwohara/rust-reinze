@@ -1,3 +1,4 @@
+pub mod common;
 mod runescape;
 
 extern crate reqwest;
@@ -28,10 +29,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
         if let Command::PRIVMSG(ref _channel, ref _message) = message.command {
             if let Some(target) = message.response_target() {
-                let re = Regex::new(r"^[-+](\w+)\s*").unwrap();
+                let re = Regex::new(r"^[-+](\w+)\s*(.*)").unwrap();
                 let matched = re.captures(_message);
                 if matched.is_some() {
-                    let cmd = matched.unwrap().get(1).unwrap().as_str();
+                    let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
+                    let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
 
                     match cmd {
                         "ping" => {
@@ -54,6 +56,34 @@ async fn main() -> Result<(), anyhow::Error> {
                                 }
                                 Err(_) => {
                                     client.send_privmsg(target, "Error getting player count")?;
+                                }
+                            };
+                        }
+                        "params" => {
+                            let params: (&str, &str) = match param.split_once(" ") {
+                                Some(params) => params,
+                                None => {
+                                    client.send_privmsg(target, "Invalid number of arguments")?;
+                                    continue;
+                                }
+                            };
+
+                            if params.0.is_empty() || params.1.is_empty() {
+                                client.send_privmsg(target, "Invalid number of arguments")?;
+                                continue;
+                            }
+
+                            match runescape::params(params.0, params.1).await {
+                                Ok(message) => {
+                                    match client.send_privmsg(target, message) {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            println!("Error sending message: {}", e);
+                                        }
+                                    };
+                                }
+                                Err(_) => {
+                                    client.send_privmsg(target, "Error getting params")?;
                                 }
                             };
                         }
