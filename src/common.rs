@@ -9,19 +9,44 @@ pub fn capitalize(s: &str) -> String {
     }
 }
 
-// Two functions for encoding messages with gray and red IRC colors
+// Gray
 // c1
 pub fn c1(s: &str) -> String {
-    format!("\x03\x0314{}\x03", s)
+    format!("\x0314{}", s)
 }
 
+// Red
 // c2
 pub fn c2(s: &str) -> String {
-    format!("\x03\x0304{}\x03", s)
+    format!("\x0304{}", s)
+}
+
+// Red
+// c3
+pub fn c3(s: &str) -> String {
+    format!("\x0305{}", s)
+}
+
+// Green
+// c4
+pub fn c4(s: &str) -> String {
+    format!("\x0303{}", s)
+}
+
+// Yellow
+// c5
+pub fn c5(s: &str) -> String {
+    format!("\x0307{}", s)
 }
 
 // A function for wrapping a string in brackets that are colored gray
 // l
 pub fn l(s: &str) -> String {
     format!("{}{}{}", c1("["), c2(s), c1("]"))
+}
+
+// A function for wrapping a string in parenthesis that are colored gray
+// p
+pub fn p(s: &str) -> String {
+    format!("{}{}{}", c1("("), c2(s), c1(")"))
 }

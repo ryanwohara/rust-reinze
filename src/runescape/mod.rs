@@ -1,3 +1,4 @@
+pub mod ge;
 mod items;
 pub mod params;
 pub mod players;
@@ -13,4 +14,8 @@ pub async fn params(skill: &str, param: &str) -> Result<String, ()> {
 
 pub async fn prices(query: &str) -> Result<String, ()> {
     prices::prices(query).await
+}
+
+pub async fn ge(query: &str) -> Result<String, ()> {
+    ge::ge(query).await
 }
