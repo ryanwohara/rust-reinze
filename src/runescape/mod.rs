@@ -1,3 +1,4 @@
+pub mod bosses;
 pub mod ge;
 mod items;
 pub mod params;
@@ -18,4 +19,8 @@ pub async fn prices(query: &str) -> Result<String, ()> {
 
 pub async fn ge(query: &str) -> Result<String, ()> {
     ge::ge(query).await
+}
+
+pub async fn boss(rsn: &str) -> Result<String, ()> {
+    bosses::bosses(rsn).await
 }

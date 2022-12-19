@@ -54,6 +54,7 @@ pub async fn ge(query: &str) -> Result<String, ()> {
                 "http://services.runescape.com/m=itemdb_oldschool/api/catalogue/detail.json?item={}",
                 &item.id
             );
+
             let response = match reqwest::get(&url).await {
                 Ok(response) => response,
                 Err(e) => {
@@ -99,8 +100,6 @@ pub async fn ge(query: &str) -> Result<String, ()> {
     }
 
     output = format!("{} {}", output, found_items.join(&c1(" | ")));
-
-    println!("{}", output);
 
     Ok(output)
 }

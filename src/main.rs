@@ -15,7 +15,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let config = Config {
         nickname: Some("RustKick".to_string()),
         server: Some("fiery.swiftirc.net".to_string()),
-        channels: vec!["#asdfghj".to_string()],
+        channels: vec!["#asdfghj,#rshelp".to_string()],
         ..Config::default()
     };
 
@@ -114,6 +114,26 @@ async fn main() -> Result<(), anyhow::Error> {
                             }
 
                             match runescape::ge(param).await {
+                                Ok(message) => {
+                                    match client.send_privmsg(target, message) {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            println!("Error sending message: {}", e);
+                                        }
+                                    };
+                                }
+                                Err(_) => {
+                                    client.send_privmsg(target, "Error getting price")?;
+                                }
+                            };
+                        }
+                        "boss" => {
+                            if param.is_empty() {
+                                client.send_privmsg(target, "Invalid number of arguments")?;
+                                continue;
+                            }
+
+                            match runescape::boss(param).await {
                                 Ok(message) => {
                                     match client.send_privmsg(target, message) {
                                         Ok(_) => {}
