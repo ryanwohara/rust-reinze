@@ -4,6 +4,8 @@ pub mod runescape;
 extern crate reqwest;
 extern crate select;
 
+use crate::common::c1;
+use crate::common::l;
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
@@ -134,13 +136,48 @@ async fn main() -> Result<(), anyhow::Error> {
                             }
 
                             match runescape::boss(param).await {
-                                Ok(message) => {
-                                    match client.send_privmsg(target, message) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            println!("Error sending message: {}", e);
+                                Ok(boss_kills) => {
+                                    // let output = format!("{} {}", l("Boss"), boss_kills.join(&c1(" | ")));
+
+                                    let prefix = l("Boss");
+                                    let mut output_boss_kills: Vec<String> = Vec::new();
+
+                                    let mut output;
+
+                                    for boss in boss_kills {
+                                        output_boss_kills.push(boss);
+
+                                        output = format!(
+                                            "{} {}",
+                                            prefix,
+                                            output_boss_kills.join(&c1(" | "))
+                                        );
+
+                                        if output_boss_kills.len() >= 8 {
+                                            match client.send_privmsg(target, output) {
+                                                Ok(_) => {}
+                                                Err(e) => {
+                                                    println!("Error sending message: {}", e);
+                                                }
+                                            };
+
+                                            output_boss_kills.clear();
                                         }
-                                    };
+                                    }
+
+                                    if output_boss_kills.len() > 0 {
+                                        output = format!(
+                                            "{} {}",
+                                            prefix,
+                                            output_boss_kills.join(&c1(" | "))
+                                        );
+                                        match client.send_privmsg(target, output) {
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                println!("Error sending message: {}", e);
+                                            }
+                                        };
+                                    }
                                 }
                                 Err(_) => {
                                     client.send_privmsg(target, "Error getting price")?;

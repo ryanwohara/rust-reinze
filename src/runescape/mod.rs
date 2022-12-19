@@ -21,6 +21,6 @@ pub async fn ge(query: &str) -> Result<String, ()> {
     ge::ge(query).await
 }
 
-pub async fn boss(rsn: &str) -> Result<String, ()> {
+pub async fn boss(rsn: &str) -> Result<Vec<String>, ()> {
     bosses::bosses(rsn).await
 }

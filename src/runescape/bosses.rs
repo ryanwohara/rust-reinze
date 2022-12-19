@@ -1,10 +1,9 @@
 use crate::common::c1;
 use crate::common::c2;
-use crate::common::l;
 use crate::common::p;
 
 #[allow(unused_comparisons)]
-pub async fn bosses(rsn: &str) -> Result<String, ()> {
+pub async fn bosses(rsn: &str) -> Result<Vec<String>, ()> {
     let bosses: [&str; 50] = [
         "Abyssal Sire",
         "Alchemical Hydra",
@@ -12,8 +11,8 @@ pub async fn bosses(rsn: &str) -> Result<String, ()> {
         "Bryophyta",
         "Callisto",
         "Cerberus",
-        "Chambers of Xeric",
-        "Chambers of Xeric: Challenge Mode",
+        "CoX",
+        "CoX: Challenge",
         "Chaos Elemental",
         "Chaos Fanatic",
         "Commander Zilyana",
@@ -41,13 +40,13 @@ pub async fn bosses(rsn: &str) -> Result<String, ()> {
         "Scorpia",
         "Skotizo",
         "Tempoross",
-        "The Guantlet",
-        "The Corrupted Gauntlet",
-        "Theatre of Blood",
-        "Theatre of Blood: Hard Mode",
+        "Guantlet",
+        "Corrupted Gauntlet",
+        "ToB",
+        "ToB: Hard",
         "Thermonuclear Smoke Devil",
-        "Tombs of Amascut",
-        "Tombs of Amascut: Expert Mode",
+        "ToA",
+        "ToA: Expert",
         "TzKal-Zuk",
         "TzTok-Jad",
         "Venenatis",
@@ -99,11 +98,14 @@ pub async fn bosses(rsn: &str) -> Result<String, ()> {
 
             if bosses.contains(&name) {
                 boss_kills.push(format!("{}: {} {}", c1(name), c2(kills), p(rank)));
+                if boss_kills.len() >= 20 {
+                    return Ok(boss_kills);
+                }
             }
         }
     }
 
-    let output = format!("{} {}", l("Boss"), boss_kills.join(&c1(" | ")));
+    // let output = format!("{} {}", l("Boss"), boss_kills.join(&c1(" | ")));
 
-    Ok(output)
+    Ok(boss_kills)
 }
