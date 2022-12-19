@@ -98,14 +98,9 @@ pub async fn bosses(rsn: &str) -> Result<Vec<String>, ()> {
 
             if bosses.contains(&name) {
                 boss_kills.push(format!("{}: {} {}", c1(name), c2(kills), p(rank)));
-                if boss_kills.len() >= 20 {
-                    return Ok(boss_kills);
-                }
             }
         }
     }
-
-    // let output = format!("{} {}", l("Boss"), boss_kills.join(&c1(" | ")));
 
     Ok(boss_kills)
 }
