@@ -1,8 +1,7 @@
 pub mod common;
-
 extern crate reqwest;
 extern crate select;
-
+mod plugins;
 use crate::common::c1;
 use crate::common::l;
 use anyhow::Result;
@@ -10,48 +9,13 @@ use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
 use regex::Regex;
-use std::fs;
 use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let mut loaded_plugins = Vec::new();
+    let mut loaded_plugins: Vec<plugins::Plugin> = Vec::new();
 
-    let plugins = fs::read_dir("plugins/").unwrap();
-
-    for plugin in plugins {
-        let plugin = plugin.unwrap();
-
-        if match plugin.path().extension() {
-            Some(ext) => ext,
-            None => continue,
-        } == "so"
-        {
-            println!("Loading plugin: {}", plugin.path().display());
-
-            unsafe {
-                // Load the dynamic library
-                let lib = Library::new(plugin.path())?;
-
-                // Get a reference to the `exported` function
-                let exported: Symbol<
-                    extern "C" fn(command: &str, query: &str) -> Result<Vec<String>, ()>,
-                > = lib.get(b"exported\0")?;
-
-                // Call the `exported` function
-                let functions = exported("", "").unwrap();
-
-                println!("Functions: {:?}", functions);
-
-                let loaded_plugin: Plugin = Plugin {
-                    name: plugin.path().to_str().unwrap().to_string(),
-                    commands: functions,
-                };
-
-                loaded_plugins.push(loaded_plugin);
-            }
-        }
-    }
+    plugins::load_plugins(&mut loaded_plugins);
 
     for plugin in &loaded_plugins {
         println!(".Plugin: {}", plugin.name);
@@ -166,9 +130,4 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-struct Plugin {
-    name: String,
-    commands: Vec<String>,
 }
