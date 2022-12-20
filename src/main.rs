@@ -107,7 +107,28 @@ async fn main() -> Result<(), anyhow::Error> {
                                 };
 
                                 for line in result {
-                                    client.send_privmsg(target, line)?;
+                                    let mut output: Vec<&str> = Vec::new();
+
+                                    let words = line.split(" ");
+
+                                    for word in words {
+                                        output.push(word);
+
+                                        if output.join(" ").len() >= 400 {
+                                            match client.send_privmsg(target, output.join(" ")) {
+                                                Ok(_) => (),
+                                                Err(e) => println!("Error sending message: {}", e),
+                                            };
+                                            output.clear();
+                                        }
+                                    }
+
+                                    if output.len() > 0 {
+                                        match client.send_privmsg(target, output.join(" ")) {
+                                            Ok(_) => (),
+                                            Err(e) => println!("Error sending message: {}", e),
+                                        };
+                                    }
                                 }
                             }
                         }
