@@ -1,11 +1,8 @@
 pub mod common;
-pub mod runescape;
 
 extern crate reqwest;
 extern crate select;
 
-use crate::common::c1;
-use crate::common::l;
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
@@ -23,7 +20,11 @@ async fn main() -> Result<(), anyhow::Error> {
     for plugin in plugins {
         let plugin = plugin.unwrap();
 
-        if plugin.path().extension().unwrap() == "so" {
+        if match plugin.path().extension() {
+            Some(ext) => ext,
+            None => continue,
+        } == "so"
+        {
             println!("Loading plugin: {}", plugin.path().display());
 
             unsafe {
@@ -50,9 +51,9 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    for plugin in loaded_plugins {
+    for plugin in &loaded_plugins {
         println!(".Plugin: {}", plugin.name);
-        for command in plugin.commands {
+        for command in &plugin.commands {
             println!("..Command: {}", command);
         }
     }
@@ -81,154 +82,35 @@ async fn main() -> Result<(), anyhow::Error> {
                     let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
                     let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
 
-                    match cmd {
-                        "ping" => {
-                            match client.send_privmsg(target, "pong!") {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    println!("Error sending message: {}", e);
-                                }
-                            };
-                        }
-                        "players" => {
-                            match runescape::players().await {
-                                Ok(message) => {
-                                    match client.send_privmsg(target, message) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            println!("Error sending message: {}", e);
-                                        }
-                                    };
-                                }
-                                Err(_) => {
-                                    client.send_privmsg(target, "Error getting player count")?;
-                                }
-                            };
-                        }
-                        "params" => {
-                            let params: (&str, &str) = match param.split_once(" ") {
-                                Some(params) => params,
-                                None => {
-                                    client.send_privmsg(target, "Invalid number of arguments")?;
-                                    continue;
-                                }
-                            };
-
-                            if params.0.is_empty() || params.1.is_empty() {
-                                client.send_privmsg(target, "Invalid number of arguments")?;
-                                continue;
-                            }
-
-                            match runescape::params(params.0, params.1).await {
-                                Ok(message) => {
-                                    match client.send_privmsg(target, message) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            println!("Error sending message: {}", e);
-                                        }
-                                    };
-                                }
-                                Err(_) => {
-                                    client.send_privmsg(target, "Error getting params")?;
-                                }
-                            };
-                        }
-                        "price" => {
-                            if param.is_empty() {
-                                client.send_privmsg(target, "Invalid number of arguments")?;
-                                continue;
-                            }
-
-                            match runescape::prices(param).await {
-                                Ok(message) => {
-                                    match client.send_privmsg(target, message) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            println!("Error sending message: {}", e);
-                                        }
-                                    };
-                                }
-                                Err(_) => {
-                                    client.send_privmsg(target, "Error getting price")?;
-                                }
-                            };
-                        }
-                        "ge" => {
-                            if param.is_empty() {
-                                client.send_privmsg(target, "Invalid number of arguments")?;
-                                continue;
-                            }
-
-                            match runescape::ge(param).await {
-                                Ok(message) => {
-                                    match client.send_privmsg(target, message) {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            println!("Error sending message: {}", e);
-                                        }
-                                    };
-                                }
-                                Err(_) => {
-                                    client.send_privmsg(target, "Error getting price")?;
-                                }
-                            };
-                        }
-                        "boss" => {
-                            if param.is_empty() {
-                                client.send_privmsg(target, "Invalid number of arguments")?;
-                                continue;
-                            }
-
-                            match runescape::boss(param).await {
-                                Ok(boss_kills) => {
-                                    // let output = format!("{} {}", l("Boss"), boss_kills.join(&c1(" | ")));
-
-                                    let prefix = l("Boss");
-                                    let mut output_boss_kills: Vec<String> = Vec::new();
-
-                                    let mut output;
-
-                                    for boss in boss_kills {
-                                        output_boss_kills.push(boss);
-
-                                        output = format!(
-                                            "{} {}",
-                                            prefix,
-                                            output_boss_kills.join(&c1(" | "))
-                                        );
-
-                                        if output_boss_kills.len() >= 8 {
-                                            match client.send_privmsg(target, output) {
-                                                Ok(_) => {}
-                                                Err(e) => {
-                                                    println!("Error sending message: {}", e);
-                                                }
-                                            };
-
-                                            output_boss_kills.clear();
-                                        }
+                    for plugin in &loaded_plugins {
+                        if plugin.commands.contains(&cmd.to_string()) {
+                            unsafe {
+                                let lib = match Library::new(plugin.name.clone()) {
+                                    Ok(lib) => lib,
+                                    Err(e) => {
+                                        println!("Error loading plugin: {}", e);
+                                        continue;
                                     }
+                                };
 
-                                    if output_boss_kills.len() > 0 {
-                                        output = format!(
-                                            "{} {}",
-                                            prefix,
-                                            output_boss_kills.join(&c1(" | "))
-                                        );
-                                        match client.send_privmsg(target, output) {
-                                            Ok(_) => {}
-                                            Err(e) => {
-                                                println!("Error sending message: {}", e);
-                                            }
-                                        };
-                                    }
+                                let exported: Symbol<
+                                    extern "C" fn(
+                                        command: &str,
+                                        query: &str,
+                                    )
+                                        -> Result<Vec<String>, ()>,
+                                > = lib.get(b"exported\0")?;
+
+                                let result = match exported(cmd, param) {
+                                    Ok(result) => result,
+                                    Err(_) => continue,
+                                };
+
+                                for line in result {
+                                    client.send_privmsg(target, line)?;
                                 }
-                                Err(_) => {
-                                    client.send_privmsg(target, "Error getting price")?;
-                                }
-                            };
+                            }
                         }
-                        _ => {}
                     }
                 }
             }
