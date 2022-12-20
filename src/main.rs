@@ -9,10 +9,65 @@ use crate::common::l;
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
+use libloading::{Library, Symbol};
 use regex::Regex;
+use std::fs;
+use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    let mut loaded_plugins = Vec::new();
+
+    let plugins = fs::read_dir("plugins/").unwrap();
+
+    for plugin in plugins {
+        let plugin = plugin.unwrap();
+
+        if plugin.path().extension().unwrap() == "so" {
+            println!("Loading plugin: {}", plugin.path().display());
+
+            unsafe {
+                // Load the dynamic library
+                let lib = Library::new(plugin.path())?;
+
+                // Get a reference to the `exported` function
+                let exported: Symbol<
+                    extern "C" fn(command: &str, query: &str) -> Result<Vec<String>, ()>,
+                > = lib.get(b"exported\0")?;
+
+                // Call the `exported` function
+                let functions = exported("", "").unwrap();
+
+                println!("Functions: {:?}", functions);
+
+                let loaded_plugin: Plugin = Plugin {
+                    name: plugin.path().to_str().unwrap().to_string(),
+                    commands: functions,
+                };
+
+                loaded_plugins.push(loaded_plugin);
+
+                // loaded_plugins
+                //     .push(unsafe { Library::new(plugin.path().to_str().unwrap()).unwrap() });
+
+                // let exported: Symbol<unsafe extern "C" fn(query: &str) -> Vec<String>> = unsafe {
+                //     loaded_plugins[loaded_plugins.len() - 1]
+                //         .get(b"exported")
+                //         .unwrap()
+                // };
+
+                // commands.push(exported);
+            }
+        }
+    }
+
+    for plugin in loaded_plugins {
+        println!(".Plugin: {}", plugin.name);
+        for command in plugin.commands {
+            println!("..Command: {}", command);
+        }
+    }
+
     // We can also load the Config at runtime via Config::load("path/to/config.toml")
     let config = Config {
         nickname: Some("RustKick".to_string()),
@@ -192,4 +247,9 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+struct Plugin {
+    name: String,
+    commands: Vec<String>,
 }
