@@ -46,17 +46,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 };
 
                 loaded_plugins.push(loaded_plugin);
-
-                // loaded_plugins
-                //     .push(unsafe { Library::new(plugin.path().to_str().unwrap()).unwrap() });
-
-                // let exported: Symbol<unsafe extern "C" fn(query: &str) -> Vec<String>> = unsafe {
-                //     loaded_plugins[loaded_plugins.len() - 1]
-                //         .get(b"exported")
-                //         .unwrap()
-                // };
-
-                // commands.push(exported);
             }
         }
     }
