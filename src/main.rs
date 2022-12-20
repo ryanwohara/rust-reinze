@@ -17,6 +17,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     plugins::load_plugins(&mut loaded_plugins);
 
+    // Print out valid commands at startup
     for plugin in &loaded_plugins {
         println!(".Plugin: {}", plugin.name);
         for command in &plugin.commands {
@@ -46,7 +47,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 let matched = re.captures(_message);
                 if matched.is_some() {
                     let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
+                    let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
 
+                    // Catch commands that are handled by the bot itself
                     match cmd {
                         "help" => {
                             let mut commands: Vec<&str> = Vec::new();
@@ -57,22 +60,14 @@ async fn main() -> Result<(), anyhow::Error> {
                                 }
                             }
 
-                            match client.send_privmsg(
-                                target,
-                                format!("{} {}", l("Commands"), c1(&commands.join(", "))),
-                            ) {
-                                Ok(_) => true,
-                                Err(e) => {
-                                    println!("Error sending message: {}", e);
-                                    false
-                                }
-                            };
+                            let output = format!("{} {}", l("Commands"), c1(&commands.join(", ")));
+
+                            send_privmsg(&client, target, &output);
                         }
                         _ => {}
                     }
 
-                    let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
-
+                    // Catch commands that are handled by plugins
                     for plugin in &loaded_plugins {
                         if plugin.commands.contains(&cmd.to_string()) {
                             unsafe {
@@ -98,28 +93,7 @@ async fn main() -> Result<(), anyhow::Error> {
                                 };
 
                                 for line in result {
-                                    let mut output: Vec<&str> = Vec::new();
-
-                                    let words = line.split(" ");
-
-                                    for word in words {
-                                        output.push(word);
-
-                                        if output.join(" ").len() >= 400 {
-                                            match client.send_privmsg(target, output.join(" ")) {
-                                                Ok(_) => (),
-                                                Err(e) => println!("Error sending message: {}", e),
-                                            };
-                                            output.clear();
-                                        }
-                                    }
-
-                                    if output.len() > 0 {
-                                        match client.send_privmsg(target, output.join(" ")) {
-                                            Ok(_) => (),
-                                            Err(e) => println!("Error sending message: {}", e),
-                                        };
-                                    }
+                                    send_privmsg(&client, target, &line);
                                 }
                             }
                         }
@@ -130,4 +104,38 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+fn send_privmsg(client: &Client, target: &str, message: &str) -> bool {
+    let mut output: Vec<&str> = Vec::new();
+
+    let words = message.split(" ");
+
+    for word in words {
+        output.push(word);
+
+        if output.join(" ").len() >= 400 {
+            match client.send_privmsg(target, output.join(" ")) {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Error sending message: {}", e);
+                    return false;
+                }
+            };
+            output.clear();
+        }
+    }
+
+    if output.len() > 0 {
+        match client.send_privmsg(target, output.join(" ")) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error sending message: {}", e);
+
+                return false;
+            }
+        };
+    }
+
+    return true;
 }
