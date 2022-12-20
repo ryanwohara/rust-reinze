@@ -42,4 +42,12 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
             }
         }
     }
+
+    // Print out valid commands at startup
+    for plugin in loaded_plugins {
+        println!(".Plugin: {}", plugin.name);
+        for command in &plugin.commands {
+            println!("..Command: {}", command);
+        }
+    }
 }

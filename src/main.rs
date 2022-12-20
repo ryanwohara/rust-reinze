@@ -17,21 +17,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     plugins::load_plugins(&mut loaded_plugins);
 
-    // Print out valid commands at startup
-    for plugin in &loaded_plugins {
-        println!(".Plugin: {}", plugin.name);
-        for command in &plugin.commands {
-            println!("..Command: {}", command);
-        }
-    }
-
-    // We can also load the Config at runtime via Config::load("path/to/config.toml")
-    let config = Config {
-        nickname: Some("RustKick".to_string()),
-        server: Some("fiery.swiftirc.net".to_string()),
-        channels: vec!["#asdfghj,#rshelp".to_string()],
-        ..Config::default()
-    };
+    let config = Config::load("config.toml").unwrap();
 
     let mut client = Client::from_config(config).await?;
     client.identify()?;
