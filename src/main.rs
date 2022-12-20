@@ -3,6 +3,8 @@ pub mod common;
 extern crate reqwest;
 extern crate select;
 
+use crate::common::c1;
+use crate::common::l;
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
@@ -80,6 +82,31 @@ async fn main() -> Result<(), anyhow::Error> {
                 let matched = re.captures(_message);
                 if matched.is_some() {
                     let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
+
+                    match cmd {
+                        "help" => {
+                            let mut commands: Vec<&str> = Vec::new();
+
+                            for plugin in &loaded_plugins {
+                                for command in &plugin.commands {
+                                    commands.push(command);
+                                }
+                            }
+
+                            match client.send_privmsg(
+                                target,
+                                format!("{} {}", l("Commands"), c1(&commands.join(", "))),
+                            ) {
+                                Ok(_) => true,
+                                Err(e) => {
+                                    println!("Error sending message: {}", e);
+                                    false
+                                }
+                            };
+                        }
+                        _ => {}
+                    }
+
                     let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
 
                     for plugin in &loaded_plugins {
