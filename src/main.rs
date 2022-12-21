@@ -1,14 +1,20 @@
 pub mod common;
+mod plugins;
+
+extern crate chrono;
 extern crate reqwest;
 extern crate select;
-mod plugins;
+
 use crate::common::c1;
 use crate::common::l;
+
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
 use regex::Regex;
+use std::thread;
+use std::time::Duration;
 use tokio;
 
 #[tokio::main]
@@ -23,6 +29,13 @@ async fn main() -> Result<(), anyhow::Error> {
     client.identify()?;
 
     let mut stream = client.stream()?;
+
+    thread::spawn(|| loop {
+        let now = chrono::Local::now();
+        let timestamp = now.format("%T").to_string();
+        println!("{}", timestamp);
+        thread::sleep(Duration::from_secs(60));
+    });
 
     while let Some(message) = stream.next().await.transpose()? {
         print!("{}", message);

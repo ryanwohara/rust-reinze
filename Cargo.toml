@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.55"
+chrono = "0.4.23"
 format_num = "0.1.0"
 futures = "0.3.21"
 rust-ini = "0.18.0"
