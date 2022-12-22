@@ -62,6 +62,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             let output = format!("{} {}", l("Commands"), c1(&commands.join(", ")));
 
                             send_privmsg(&client, target, &output);
+                            continue;
                         }
                         _ => {}
                     }

@@ -42,7 +42,6 @@ Tarromin~19~75~16~-~18
 Harralander~26~75~21.5~-~24
 Goutweed~29~75~105~-~45
 Ranarr Weed~32~75~27~-~30.5
-Spirit Weed~36~75~32~-~36
 Toadflax~38~75~34~-~38.5
 Irit Leaf~44~75~43~-~48.5
 Avantoe~50~75~54.5~-~61.5
@@ -52,9 +51,9 @@ Cadantine~67~75~106.5~-~120
 Lantadyme~73~75~134.5~-~151.5
 Dwarf Weed~79~75~170.5~-~192
 Torstol~85~75~199.5~-~224.5
-Evil Turnip~42~5~41~-~46
 Bittercap Mushroom~53~220~61.5~-~57.7
 Cactus~55~520~66.5~374~25
 Belladonna~63~320~91~-~512
 Calquat Tree~72~1200~129.5~12096~48.5~8 Poison ivy berries
 Spirit Tree~83~3680~199.5~19301.8~-~1 Ground Suqah tooth, 5 Monkey nuts, 1 Monkey bar
+Celastrus Tree~85~800~200~14130~23.5~8 Potato cactus
