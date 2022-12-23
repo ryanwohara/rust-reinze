@@ -64,6 +64,11 @@ async fn main() -> Result<(), anyhow::Error> {
                             send_privmsg(&client, target, &output);
                             continue;
                         }
+                        "reload" => {
+                            loaded_plugins.clear();
+                            plugins::load_plugins(&mut loaded_plugins);
+                            continue;
+                        }
                         _ => {}
                     }
 
