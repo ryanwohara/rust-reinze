@@ -41,64 +41,75 @@ async fn main() -> Result<(), anyhow::Error> {
         print!("{}", message);
 
         if let Command::PRIVMSG(ref _channel, ref _message) = message.command {
-            if let Some(target) = message.response_target() {
-                let re = Regex::new(r"^[-+](\w+)\s*(.*)").unwrap();
-                let matched = re.captures(_message);
-                if matched.is_some() {
-                    let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
-                    let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
+            if let Some(prefix) = &message.prefix {
+                let author = match prefix {
+                    Prefix::Nickname(nick, _, _) => nick,
+                    Prefix::ServerName(name) => name,
+                    _ => "",
+                };
 
-                    // Catch commands that are handled by the bot itself
-                    match cmd {
-                        "help" => {
-                            let mut commands: Vec<&str> = Vec::new();
+                if let Some(target) = message.response_target() {
+                    let re = Regex::new(r"^[-+](\w+)\s*(.*)").unwrap();
+                    let matched = re.captures(_message);
 
-                            for plugin in &loaded_plugins {
-                                for command in &plugin.commands {
-                                    commands.push(command);
-                                }
-                            }
+                    if matched.is_some() {
+                        let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
+                        let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
 
-                            let output = format!("{} {}", l("Commands"), c1(&commands.join(", ")));
+                        // Catch commands that are handled by the bot itself
+                        match cmd {
+                            "help" => {
+                                let mut commands: Vec<&str> = Vec::new();
 
-                            send_privmsg(&client, target, &output);
-                            continue;
-                        }
-                        "reload" => {
-                            loaded_plugins.clear();
-                            plugins::load_plugins(&mut loaded_plugins);
-                            continue;
-                        }
-                        _ => {}
-                    }
-
-                    // Catch commands that are handled by plugins
-                    for plugin in &loaded_plugins {
-                        if plugin.commands.contains(&cmd.to_string()) {
-                            unsafe {
-                                let lib = match Library::new(plugin.name.clone()) {
-                                    Ok(lib) => lib,
-                                    Err(e) => {
-                                        println!("Error loading plugin: {}", e);
-                                        continue;
+                                for plugin in &loaded_plugins {
+                                    for command in &plugin.commands {
+                                        commands.push(command);
                                     }
-                                };
+                                }
 
-                                let exported: Symbol<
-                                    extern "C" fn(
-                                        command: &str,
-                                        query: &str,
-                                    )
-                                        -> Result<Vec<String>, ()>,
-                                > = lib.get(b"exported\0")?;
+                                let output =
+                                    format!("{} {}", l("Commands"), c1(&commands.join(", ")));
 
-                                let result = match exported(cmd, param) {
-                                    Ok(result) => result,
-                                    Err(_) => continue,
-                                };
+                                send_privmsg(&client, target, &output);
+                                continue;
+                            }
+                            "reload" => {
+                                loaded_plugins.clear();
+                                plugins::load_plugins(&mut loaded_plugins);
+                                continue;
+                            }
+                            _ => {}
+                        }
 
-                                for line in result {
-                                    send_privmsg(&client, target, &line);
+                        // Catch commands that are handled by plugins
+                        for plugin in &loaded_plugins {
+                            if plugin.commands.contains(&cmd.to_string()) {
+                                unsafe {
+                                    let lib = match Library::new(plugin.name.clone()) {
+                                        Ok(lib) => lib,
+                                        Err(e) => {
+                                            println!("Error loading plugin: {}", e);
+                                            continue;
+                                        }
+                                    };
+
+                                    let exported: Symbol<
+                                        extern "C" fn(
+                                            command: &str,
+                                            query: &str,
+                                            author: &str,
+                                        )
+                                            -> Result<Vec<String>, ()>,
+                                    > = lib.get(b"exported\0")?;
+
+                                    let result = match exported(cmd, param, author) {
+                                        Ok(result) => result,
+                                        Err(_) => continue,
+                                    };
+
+                                    for line in result {
+                                        send_privmsg(&client, target, &line);
+                                    }
                                 }
                             }
                         }
