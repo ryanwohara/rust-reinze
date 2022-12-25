@@ -2,3 +2,4 @@
 /Cargo.lock
 /config.toml
 /plugins/*.so
+/lib/*.json
