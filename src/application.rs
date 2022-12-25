@@ -2,9 +2,9 @@ extern crate chrono;
 extern crate reqwest;
 extern crate select;
 
-use crate::common::c1;
-use crate::common::l;
+use crate::common;
 use crate::plugins;
+
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
@@ -61,8 +61,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     }
                                 }
 
-                                let output =
-                                    format!("{} {}", l("Commands"), c1(&commands.join(", ")));
+                                let output = format!(
+                                    "{} {}",
+                                    common::l("Commands"),
+                                    common::c1(&commands.join(", "))
+                                );
 
                                 send_privmsg(&client, target, &output);
                                 continue;
@@ -87,6 +90,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         }
                                     };
 
+                                    // Load the "exported" function from the plugin
                                     let exported: Symbol<
                                         extern "C" fn(
                                             command: &str,
@@ -96,6 +100,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                             -> Result<Vec<String>, ()>,
                                     > = lib.get(b"exported\0")?;
 
+                                    // Pass the command, query, and author to the plugin
                                     let result = match exported(cmd, param, author) {
                                         Ok(result) => result,
                                         Err(_) => continue,
