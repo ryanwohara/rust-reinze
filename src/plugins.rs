@@ -7,10 +7,22 @@ pub struct Plugin {
 }
 
 pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
-    let plugins = fs::read_dir("plugins/").unwrap();
+    let plugins = match fs::read_dir("plugins/") {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            println!("Error loading plugins: {}", e);
+            return;
+        }
+    };
 
     for plugin in plugins {
-        let plugin = plugin.unwrap();
+        let plugin = match plugin {
+            Ok(plugin) => plugin,
+            Err(e) => {
+                println!("Error loading plugins: {}", e);
+                continue;
+            }
+        };
 
         if match plugin.path().extension() {
             Some(ext) => ext,
@@ -21,20 +33,42 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
 
             unsafe {
                 // Load the dynamic library
-                let lib = Library::new(plugin.path()).unwrap();
+                let lib = match Library::new(plugin.path()) {
+                    Ok(lib) => lib,
+                    Err(e) => {
+                        println!("Error loading plugin: {}", e);
+                        continue;
+                    }
+                };
 
                 // Get a reference to the `exported` function
                 let exported: Symbol<
-                    extern "C" fn(command: &str, query: &str) -> Result<Vec<String>, ()>,
-                > = lib.get(b"exported\0").unwrap();
+                    extern "C" fn(
+                        command: &str,
+                        query: &str,
+                        author: &str,
+                    ) -> Result<Vec<String>, ()>,
+                > = match lib.get(b"exported\0") {
+                    Ok(exported) => exported,
+                    Err(e) => {
+                        println!("Error loading plugin: {}", e);
+                        continue;
+                    }
+                };
 
                 // Call the `exported` function
-                let functions = exported("", "").unwrap();
+                let functions = match exported("", "", "") {
+                    Ok(functions) => functions,
+                    Err(_) => continue,
+                };
 
                 println!("Functions: {:?}", functions);
 
                 let loaded_plugin: Plugin = Plugin {
-                    name: plugin.path().to_str().unwrap().to_string(),
+                    name: match plugin.path().to_str() {
+                        Some(name) => name.to_string(),
+                        None => continue,
+                    },
                     commands: functions,
                 };
 
