@@ -37,10 +37,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         if let Command::PRIVMSG(ref _channel, ref _message) = message.command {
             if let Some(prefix) = &message.prefix {
-                let author = match prefix {
-                    Prefix::Nickname(nick, _, _) => nick,
-                    Prefix::ServerName(name) => name,
-                };
+                let author = prefix.to_string();
 
                 if let Some(target) = message.response_target() {
                     let re = Regex::new(r"^[-+](\w+)\s*(.*)").unwrap();
@@ -71,8 +68,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 continue;
                             }
                             "reload" => {
-                                loaded_plugins.clear();
-                                plugins::load_plugins(&mut loaded_plugins);
+                                if author == "Dragon!~Dragon@administrator.swiftirc.net" {
+                                    loaded_plugins.clear();
+                                    plugins::load_plugins(&mut loaded_plugins);
+                                }
+
                                 continue;
                             }
                             _ => {}
@@ -80,7 +80,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // Catch commands that are handled by plugins
                         for plugin in &loaded_plugins {
-                            if plugin.commands.contains(&cmd.to_string()) {
+                            if plugin.commands.contains(&cmd.to_lowercase().to_string()) {
                                 unsafe {
                                     let lib = match Library::new(plugin.name.clone()) {
                                         Ok(lib) => lib,
@@ -101,7 +101,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     > = lib.get(b"exported\0")?;
 
                                     // Pass the command, query, and author to the plugin
-                                    let result = match exported(cmd, param, author) {
+                                    let result = match exported(cmd, param, &author) {
                                         Ok(result) => result,
                                         Err(_) => continue,
                                     };
