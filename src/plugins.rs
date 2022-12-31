@@ -25,7 +25,6 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
             }
         };
 
-        let dynlink = ["so", "dll"];
         let path = plugin.path();
         let extension = match path.extension() {
             Some(ext) => match ext.to_str() {
@@ -35,7 +34,7 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
             None => continue,
         };
 
-        if dynlink.contains(&extension) {
+        if ["so", "dll"].contains(&extension) {
             println!("Loading plugin: {}", plugin.path().display());
 
             unsafe {
