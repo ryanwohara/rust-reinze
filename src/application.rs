@@ -80,7 +80,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // Catch commands that are handled by plugins
                         for plugin in &loaded_plugins {
-                            if plugin.commands.contains(&cmd.to_lowercase().to_string()) {
+                            if plugin.triggers.contains(&cmd.to_lowercase().to_string()) {
                                 unsafe {
                                     let lib = match Library::new(plugin.name.clone()) {
                                         Ok(lib) => lib,
