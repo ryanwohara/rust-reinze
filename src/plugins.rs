@@ -4,6 +4,7 @@ use std::fs;
 pub struct Plugin {
     pub name: String,
     pub commands: Vec<String>,
+    pub triggers: Vec<String>,
 }
 
 pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
@@ -62,14 +63,20 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
                     Err(_) => continue,
                 };
 
-                println!("Functions: {:?}", functions);
+                let commands = match exported("help", "", "") {
+                    Ok(commands) => commands,
+                    Err(_) => continue,
+                };
+
+                println!("Commands: {:?}", commands);
 
                 let loaded_plugin: Plugin = Plugin {
                     name: match plugin.path().to_str() {
                         Some(name) => name.to_string(),
                         None => continue,
                     },
-                    commands: functions,
+                    commands: commands,
+                    triggers: functions,
                 };
 
                 loaded_plugins.push(loaded_plugin);
