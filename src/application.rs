@@ -40,12 +40,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 let author = prefix.to_string();
 
                 if let Some(target) = message.response_target() {
-                    let re = Regex::new(r"^[-+](\w+)\s*(.*)").unwrap();
+                    let re = Regex::new(r"^([-+])(\w+)\s*(.*)").unwrap();
                     let matched = re.captures(_message);
 
                     if matched.is_some() {
-                        let cmd = matched.as_ref().unwrap().get(1).unwrap().as_str();
-                        let param = matched.as_ref().unwrap().get(2).unwrap().as_str();
+                        let trigger = matched.as_ref().unwrap().get(1).unwrap().as_str();
+                        let cmd = matched.as_ref().unwrap().get(2).unwrap().as_str();
+                        let param = matched.as_ref().unwrap().get(3).unwrap().as_str();
+
+                        let respond_method = match trigger {
+                            "+" => send_privmsg,
+                            "-" => send_notice,
+                            _ => send_privmsg,
+                        };
 
                         // Catch commands that are handled by the bot itself
                         match cmd {
@@ -64,7 +71,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     common::c1(&commands.join(", "))
                                 );
 
-                                send_privmsg(&client, target, &output);
+                                respond_method(&client, target, &output);
                                 continue;
                             }
                             "reload" => {
@@ -107,7 +114,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     };
 
                                     for line in result {
-                                        send_privmsg(&client, target, &line);
+                                        respond_method(&client, target, &line);
                                     }
                                 }
                             }
@@ -143,6 +150,40 @@ fn send_privmsg(client: &Client, target: &str, message: &str) -> bool {
 
     if output.len() > 0 {
         match client.send_privmsg(target, output.join(" ")) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error sending message: {}", e);
+
+                return false;
+            }
+        };
+    }
+
+    return true;
+}
+
+fn send_notice(client: &Client, target: &str, message: &str) -> bool {
+    let mut output: Vec<&str> = Vec::new();
+
+    let words = message.split(" ");
+
+    for word in words {
+        output.push(word);
+
+        if output.join(" ").len() >= 400 {
+            match client.send_notice(target, output.join(" ")) {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Error sending message: {}", e);
+                    return false;
+                }
+            };
+            output.clear();
+        }
+    }
+
+    if output.len() > 0 {
+        match client.send_notice(target, output.join(" ")) {
             Ok(_) => (),
             Err(e) => {
                 println!("Error sending message: {}", e);
