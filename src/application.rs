@@ -48,10 +48,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         let cmd = matched.as_ref().unwrap().get(2).unwrap().as_str();
                         let param = matched.as_ref().unwrap().get(3).unwrap().as_str();
 
-                        let respond_method = match trigger {
-                            "+" => send_privmsg,
-                            "-" => send_notice,
-                            _ => send_privmsg,
+                        let respond_method: fn(&Client, &str, &str) -> bool = match trigger {
+                            "+" => process_privmsg,
+                            "-" => process_notice,
+                            _ => process_privmsg,
                         };
 
                         // Catch commands that are handled by the bot itself
@@ -72,6 +72,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 );
 
                                 respond_method(&client, target, &output);
+
                                 continue;
                             }
                             "reload" => {
@@ -128,41 +129,40 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn process_privmsg(client: &Client, target: &str, message: &str) -> bool {
+    process_message(send_privmsg, client, target, message)
+}
+
 fn send_privmsg(client: &Client, target: &str, message: &str) -> bool {
-    let mut output: Vec<&str> = Vec::new();
-
-    let words = message.split(" ");
-
-    for word in words {
-        output.push(word);
-
-        if output.join(" ").len() >= 400 {
-            match client.send_privmsg(target, output.join(" ")) {
-                Ok(_) => (),
-                Err(e) => {
-                    println!("Error sending message: {}", e);
-                    return false;
-                }
-            };
-            output.clear();
+    match client.send_privmsg(target, message) {
+        Ok(_) => true,
+        Err(e) => {
+            println!("Error sending message: {}", e);
+            false
         }
     }
+}
 
-    if output.len() > 0 {
-        match client.send_privmsg(target, output.join(" ")) {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Error sending message: {}", e);
-
-                return false;
-            }
-        };
-    }
-
-    return true;
+fn process_notice(client: &Client, target: &str, message: &str) -> bool {
+    process_message(send_notice, client, target, message)
 }
 
 fn send_notice(client: &Client, target: &str, message: &str) -> bool {
+    match client.send_notice(target, message) {
+        Ok(_) => true,
+        Err(e) => {
+            println!("Error sending notice: {}", e);
+            false
+        }
+    }
+}
+
+fn process_message(
+    function: fn(&Client, &str, &str) -> bool,
+    client: &Client,
+    target: &str,
+    message: &str,
+) -> bool {
     let mut output: Vec<&str> = Vec::new();
 
     let words = message.split(" ");
@@ -171,27 +171,21 @@ fn send_notice(client: &Client, target: &str, message: &str) -> bool {
         output.push(word);
 
         if output.join(" ").len() >= 400 {
-            match client.send_notice(target, output.join(" ")) {
-                Ok(_) => (),
-                Err(e) => {
-                    println!("Error sending message: {}", e);
-                    return false;
-                }
+            match function(client, target, &output.join(" ")) {
+                true => (),
+                false => return false,
             };
+
             output.clear();
         }
     }
 
     if output.len() > 0 {
-        match client.send_notice(target, output.join(" ")) {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Error sending message: {}", e);
-
-                return false;
-            }
+        match function(client, target, &output.join(" ")) {
+            true => (),
+            false => return false,
         };
     }
 
-    return true;
+    true
 }
