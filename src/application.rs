@@ -38,8 +38,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Command::PRIVMSG(ref _channel, ref _message) = message.command {
             if let Some(prefix) = &message.prefix {
                 let author = prefix.to_string();
+                let nick = author.split("!").collect::<Vec<&str>>()[0].to_string();
 
-                if let Some(target) = message.response_target() {
+                if let Some(response_target) = message.response_target() {
                     let re = Regex::new(r"^([-+])(\w+)\s*(.*)").unwrap();
                     let matched = re.captures(_message);
 
@@ -52,6 +53,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             "+" => process_privmsg,
                             "-" => process_notice,
                             _ => process_privmsg,
+                        };
+
+                        let target = match trigger {
+                            "+" => response_target,
+                            "-" => &nick,
+                            _ => response_target,
                         };
 
                         // Catch commands that are handled by the bot itself
