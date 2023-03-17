@@ -35,19 +35,31 @@ pub async fn run() -> Result<(), anyhow::Error> {
     while let Some(message) = stream.next().await.transpose()? {
         print!("{}", message);
 
-        if let Command::PRIVMSG(ref _channel, ref _message) = message.command {
+        if let Command::PRIVMSG(ref _channel, ref msg) = message.command {
             if let Some(prefix) = &message.prefix {
                 let author = prefix.to_string();
                 let nick = author.split("!").collect::<Vec<&str>>()[0].to_string();
 
                 if let Some(response_target) = message.response_target() {
-                    let re = Regex::new(r"^([-+])(\w+)\s*(.*)").unwrap();
-                    let matched = re.captures(_message);
+                    let re = Regex::new(r"^([-+])([a-zA-Z\d]+)(?:\s+(.*))?$").unwrap();
+                    let matched = match re.captures(msg) {
+                        Some(matched) => vec![matched],
+                        None => vec![],
+                    };
 
-                    if matched.is_some() {
-                        let trigger = matched.as_ref().unwrap().get(1).unwrap().as_str();
-                        let cmd = matched.as_ref().unwrap().get(2).unwrap().as_str();
-                        let param = matched.as_ref().unwrap().get(3).unwrap().as_str();
+                    if matched.len() > 0 {
+                        let trigger = match matched[0].get(1) {
+                            Some(s) => s.as_str(),
+                            None => "",
+                        };
+                        let cmd = match matched[0].get(2) {
+                            Some(s) => s.as_str(),
+                            None => "",
+                        };
+                        let param = match matched[0].get(3) {
+                            Some(s) => s.as_str(),
+                            None => "",
+                        };
 
                         let respond_method: fn(&Client, &str, &str) -> bool = match trigger {
                             "+" => process_privmsg,
@@ -95,7 +107,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
                         // Catch commands that are handled by plugins
                         for plugin in &loaded_plugins {
-                            if plugin.triggers.contains(&cmd.to_lowercase().to_string()) {
+                            for command in &plugin.triggers {
+                                let re = match Regex::new(&command) {
+                                    Ok(re) => re,
+                                    Err(e) => {
+                                        println!("Error loading regex: {}", e);
+                                        continue;
+                                    }
+                                };
+
+                                match re.captures(&cmd) {
+                                    Some(_) => (),
+                                    None => continue,
+                                };
+
                                 unsafe {
                                     let lib = match Library::new(plugin.name.clone()) {
                                         Ok(lib) => lib,
