@@ -10,6 +10,8 @@ use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
 use regex::Regex;
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 use std::thread;
 use std::time::Duration;
 
@@ -133,20 +135,35 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     // Load the "exported" function from the plugin
                                     let exported: Symbol<
                                         extern "C" fn(
-                                            command: &str,
-                                            query: &str,
-                                            author: &str,
+                                            command: *const c_char,
+                                            query: *const c_char,
+                                            author: *const c_char,
                                         )
-                                            -> Result<Vec<String>, ()>,
+                                            -> *mut c_char,
                                     > = lib.get(b"exported\0")?;
 
-                                    // Pass the command, query, and author to the plugin
-                                    let result = match exported(cmd, param, &author) {
-                                        Ok(result) => result,
+                                    // Convert the command, query, and author to C strings
+                                    let cstr_cmd = match CString::new(cmd) {
+                                        Ok(cmd) => cmd.into_raw(),
+                                        Err(_) => continue,
+                                    };
+                                    let cstr_param = match CString::new(param) {
+                                        Ok(param) => param.into_raw(),
+                                        Err(_) => continue,
+                                    };
+                                    let cstr_author = match CString::new(author.to_owned()) {
+                                        Ok(author) => author.into_raw(),
                                         Err(_) => continue,
                                     };
 
-                                    for line in result {
+                                    // Pass the command, query, and author to the plugin
+                                    let raw_result = exported(cstr_cmd, cstr_param, cstr_author);
+                                    let results = match CStr::from_ptr(raw_result).to_str() {
+                                        Ok(result) => result.split("\n").map(|s| s.to_string()),
+                                        Err(_) => continue,
+                                    };
+
+                                    for line in results {
                                         respond_method(&client, target, &line);
                                     }
                                 }

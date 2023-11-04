@@ -1,5 +1,7 @@
 use libloading::{Library, Symbol};
+use std::ffi::{CStr, CString};
 use std::fs;
+use std::os::raw::c_char;
 
 pub struct Plugin {
     pub name: String,
@@ -50,10 +52,10 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
                 // Get a reference to the `exported` function
                 let exported: Symbol<
                     extern "C" fn(
-                        command: &str,
-                        query: &str,
-                        author: &str,
-                    ) -> Result<Vec<String>, ()>,
+                        command: *const c_char,
+                        query: *const c_char,
+                        author: *const c_char,
+                    ) -> *mut c_char,
                 > = match lib.get(b"exported\0") {
                     Ok(exported) => exported,
                     Err(e) => {
@@ -62,14 +64,17 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
                     }
                 };
 
+                let empty = CString::new("").unwrap().into_raw();
                 // Call the `exported` function
-                let functions = match exported("", "", "") {
-                    Ok(functions) => functions,
+                let raw_triggers = exported(empty, empty, empty);
+                let triggers = match CStr::from_ptr(raw_triggers).to_str() {
+                    Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
                     Err(_) => continue,
                 };
 
-                let commands = match exported("help", "", "") {
-                    Ok(commands) => commands,
+                let raw_commands = exported(CString::new("help").unwrap().into_raw(), empty, empty);
+                let commands = match CStr::from_ptr(raw_commands).to_str() {
+                    Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
                     Err(_) => continue,
                 };
 
@@ -81,7 +86,7 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
                         None => continue,
                     },
                     commands: commands,
-                    triggers: functions,
+                    triggers: triggers,
                 };
 
                 loaded_plugins.push(loaded_plugin);
