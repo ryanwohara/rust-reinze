@@ -36,62 +36,61 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
             None => continue,
         };
 
-        if ["so", "dll"].contains(&extension) {
-            println!("Loading plugin: {}", plugin.path().display());
-
-            unsafe {
-                // Load the dynamic library
-                let lib = match Library::new(plugin.path()) {
-                    Ok(lib) => lib,
-                    Err(e) => {
-                        println!("Error loading plugin: {}", e);
-                        continue;
-                    }
-                };
-
-                // Get a reference to the `exported` function
-                let exported: Symbol<
-                    extern "C" fn(
-                        command: *const c_char,
-                        query: *const c_char,
-                        author: *const c_char,
-                    ) -> *mut c_char,
-                > = match lib.get(b"exported\0") {
-                    Ok(exported) => exported,
-                    Err(e) => {
-                        println!("Error loading plugin: {}", e);
-                        continue;
-                    }
-                };
-
-                let empty = CString::new("").unwrap().into_raw();
-                // Call the `exported` function
-                let raw_triggers = exported(empty, empty, empty);
-                let triggers = match CStr::from_ptr(raw_triggers).to_str() {
-                    Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
-                    Err(_) => continue,
-                };
-
-                let raw_commands = exported(CString::new("help").unwrap().into_raw(), empty, empty);
-                let commands = match CStr::from_ptr(raw_commands).to_str() {
-                    Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
-                    Err(_) => continue,
-                };
-
-                println!("Commands: {:?}", commands);
-
-                let loaded_plugin: Plugin = Plugin {
-                    name: match plugin.path().to_str() {
-                        Some(name) => name.to_string(),
-                        None => continue,
-                    },
-                    commands: commands,
-                    triggers: triggers,
-                };
-
-                loaded_plugins.push(loaded_plugin);
-            }
+        if !["so", "dll"].contains(&extension) {
+            continue;
         }
+        println!("Loading plugin: {}", plugin.path().display());
+
+        // Load the dynamic library
+        let lib = match unsafe { Library::new(plugin.path()) } {
+            Ok(lib) => lib,
+            Err(e) => {
+                println!("Error loading plugin: {}", e);
+                continue;
+            }
+        };
+
+        // Get a reference to the `exported` function
+        let exported: Symbol<
+            extern "C" fn(
+                command: *const c_char,
+                query: *const c_char,
+                author: *const c_char,
+            ) -> *mut c_char,
+        > = match unsafe { lib.get(b"exported\0") } {
+            Ok(exported) => exported,
+            Err(e) => {
+                println!("Error loading plugin: {}", e);
+                continue;
+            }
+        };
+
+        let empty = CString::new("").unwrap().into_raw();
+        // Call the `exported` function
+        let raw_triggers = exported(empty, empty, empty);
+        let triggers = match unsafe { CStr::from_ptr(raw_triggers).to_str() } {
+            Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
+            Err(_) => continue,
+        };
+
+        let raw_commands = exported(CString::new("help").unwrap().into_raw(), empty, empty);
+        let commands = match unsafe { CStr::from_ptr(raw_commands).to_str() } {
+            Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
+            Err(_) => continue,
+        };
+
+        println!("Commands: {:?}", commands);
+
+        let loaded_plugin: Plugin = Plugin {
+            name: match plugin.path().to_str() {
+                Some(name) => name.to_string(),
+                None => continue,
+            },
+            commands: commands,
+            triggers: triggers,
+        };
+
+        loaded_plugins.push(loaded_plugin);
     }
 
     // Print out valid commands at startup
