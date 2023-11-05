@@ -87,91 +87,119 @@ fn handle_incoming_message(
     message: Message,
     loaded_plugins: &mut Vec<plugins::Plugin>,
 ) -> Result<(), anyhow::Error> {
-    if let Command::PRIVMSG(ref _channel, ref msg) = message.command {
-        if let Some(prefix) = &message.prefix {
-            let author = prefix.to_string();
-            let nick: String = author.split("!").collect::<Vec<&str>>()[0].to_string();
+    let ref msg = match message.command {
+        Command::PRIVMSG(ref _channel, ref msg) => msg,
+        Command::NOTICE(ref _channel, ref msg) => msg,
+        _ => return Ok(()),
+    };
 
-            if let Some(response_target) = message.response_target() {
-                let re = Regex::new(r"^([-+])([a-zA-Z\d]+)(?:\s+(.*))?$").unwrap();
-                let matched = match re.captures(msg) {
-                    Some(matched) => vec![matched],
-                    None => vec![],
-                };
+    let prefix = match message.prefix {
+        Some(ref prefix) => prefix,
+        None => return Ok(()),
+    };
 
-                if matched.len() > 0 {
-                    let trigger = match matched[0].get(1) {
-                        Some(s) => s.as_str(),
-                        None => "",
-                    };
-                    let cmd = match matched[0].get(2) {
-                        Some(s) => s.as_str(),
-                        None => "",
-                    };
-                    let param = match matched[0].get(3) {
-                        Some(s) => s.as_str(),
-                        None => "",
-                    };
+    let author = prefix.to_string();
+    let nick: String = author.split("!").collect::<Vec<&str>>()[0].to_string();
 
-                    let respond_method: fn(&Client, &str, &str) -> bool = match trigger {
-                        "+" => process_privmsg,
-                        "-" => process_notice,
-                        _ => process_privmsg,
-                    };
+    let response_target = match message.response_target() {
+        Some(target) => target,
+        None => return Ok(()),
+    };
 
-                    let target = match trigger {
-                        "+" => response_target,
-                        "-" => &nick,
-                        _ => response_target,
-                    };
+    let re = Regex::new(r"^([-+])([a-zA-Z\d]+)(?:\s+(.*))?$").unwrap();
+    let matched = match re.captures(msg) {
+        Some(matched) => vec![matched],
+        None => vec![],
+    };
 
-                    // Catch commands that are handled by the bot itself
-                    match cmd {
-                        "help" => {
-                            let mut commands: Vec<&str> = Vec::new();
+    // if the regex match fails, just return
+    if matched.len() == 0 {
+        return Ok(());
+    }
+    let trigger = match matched[0].get(1) {
+        Some(s) => s.as_str(),
+        None => "",
+    };
+    let cmd = match matched[0].get(2) {
+        Some(s) => s.as_str(),
+        None => "",
+    };
+    let param = match matched[0].get(3) {
+        Some(s) => s.as_str(),
+        None => "",
+    };
 
-                            for plugin in loaded_plugins {
-                                for command in &plugin.commands {
-                                    commands.push(command);
-                                }
-                            }
+    let respond_method: fn(&Client, &str, &str) -> bool = match trigger {
+        "+" => process_privmsg,
+        "-" => process_notice,
+        _ => process_privmsg,
+    };
 
-                            let output = format!(
-                                "{} {}",
-                                common::l("Commands"),
-                                common::c1(&commands.join(", "))
-                            );
+    let target = match trigger {
+        "+" => response_target,
+        "-" => &nick,
+        _ => response_target,
+    };
 
-                            respond_method(&client, target, &output);
-
-                            return Ok(());
-                        }
-                        "reload" => {
-                            if author == "Dragon!~Dragon@administrator.swiftirc.net" {
-                                loaded_plugins.clear();
-                                plugins::load_plugins(loaded_plugins);
-                            }
-
-                            return Ok(());
-                        }
-                        _ => {}
-                    }
-
-                    handle_plugin_messages(
-                        respond_method,
-                        client,
-                        target,
-                        loaded_plugins,
-                        &author,
-                        cmd,
-                        param,
-                    );
-                }
-            }
-        }
+    // Catch commands that are handled by the bot itself
+    let bool = handle_core_messages(respond_method, client, target, loaded_plugins, &author, cmd);
+    if bool {
+        return Ok(());
     }
 
+    handle_plugin_messages(
+        respond_method,
+        client,
+        target,
+        loaded_plugins,
+        &author,
+        cmd,
+        param,
+    );
+
     Ok(())
+}
+
+fn handle_core_messages(
+    respond_method: fn(&Client, &str, &str) -> bool,
+    client: &Client,
+    target: &str,
+    loaded_plugins: &mut Vec<plugins::Plugin>,
+    author: &str,
+    cmd: &str,
+) -> bool {
+    match cmd {
+        "help" => {
+            let mut commands: Vec<&str> = Vec::new();
+
+            for plugin in loaded_plugins {
+                for command in &plugin.commands {
+                    commands.push(command);
+                }
+            }
+
+            let output = format!(
+                "{} {}",
+                common::l("Commands"),
+                common::c1(&commands.join(", "))
+            );
+
+            respond_method(&client, target, &output);
+
+            return true;
+        }
+        "reload" => {
+            if author == "Dragon!~Dragon@administrator.swiftirc.net" {
+                loaded_plugins.clear();
+                plugins::load_plugins(loaded_plugins);
+            }
+
+            return true;
+        }
+        _ => {}
+    }
+
+    false
 }
 
 fn handle_plugin_messages(
