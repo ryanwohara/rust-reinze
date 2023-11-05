@@ -26,7 +26,10 @@ pub async fn run() {
 
     loop {
         match run_client(&config, &mut loaded_plugins).await {
-            Ok(_) => continue,
+            Ok(_) => {
+                iterations = 0;
+                continue;
+            }
             Err(e) => println!("Error running client: {}", e),
         };
         iterations += 1;
@@ -142,10 +145,10 @@ fn handle_incoming_message(
     };
 
     // Catch commands that are handled by the bot itself
-    let bool = handle_core_messages(respond_method, client, target, loaded_plugins, &author, cmd);
-    if bool {
-        return Ok(());
-    }
+    match handle_core_messages(respond_method, client, target, loaded_plugins, &author, cmd) {
+        true => return Ok(()),
+        false => (),
+    };
 
     handle_plugin_messages(
         respond_method,
