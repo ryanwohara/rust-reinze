@@ -275,6 +275,9 @@ fn handle_plugin_messages(
             };
 
             for line in results {
+                if line.len() == 0 {
+                    continue;
+                }
                 respond_method(&client, target, &line);
             }
         }
