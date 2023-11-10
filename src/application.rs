@@ -1,8 +1,8 @@
 extern crate chrono;
+extern crate common;
 extern crate reqwest;
 extern crate select;
 
-use crate::common;
 use crate::plugins;
 
 use anyhow::Result;

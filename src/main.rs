@@ -1,8 +1,8 @@
 mod application;
-mod common;
 mod plugins;
 
 extern crate chrono;
+extern crate common;
 extern crate reqwest;
 extern crate select;
 
