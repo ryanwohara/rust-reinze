@@ -14,7 +14,7 @@ rust-ini = "0.21.0"
 irc = "0.15.0"
 libloading = "0.8.1"
 regex = "1.5.4"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 select = "0.6.0"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.90"
