@@ -11,7 +11,7 @@ common = { git = "https://github.com/ryanwohara/reinze-lib-common.git", branch =
 format_num = "0.1.0"
 futures = "0.3.21"
 rust-ini = "0.21.0"
-irc = "0.15.0"
+irc = "1.0.0"
 libloading = "0.8.1"
 regex = "1.5.4"
 reqwest = { version = "0.11", features = ["json"] }
