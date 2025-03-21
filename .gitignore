@@ -3,4 +3,6 @@
 /Cargo.lock
 /config.toml
 /plugins/*.so
+/plugins/*.dll
+/plugins/*.dylink
 /lib/*.json
