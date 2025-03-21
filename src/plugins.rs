@@ -36,7 +36,7 @@ pub fn load_plugins(loaded_plugins: &mut Vec<Plugin>) {
             None => continue,
         };
 
-        if !["so", "dll", "dylink"].contains(&extension) {
+        if !["so", "dll", "dylib"].contains(&extension) {
             continue;
         }
         println!("Loading plugin: {}", plugin.path().display());
