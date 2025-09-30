@@ -5,6 +5,7 @@ extern crate select;
 
 use crate::plugins;
 
+use crate::plugins::Plugin;
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
@@ -12,20 +13,19 @@ use libloading::{Library, Symbol};
 use regex::Regex;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
 
 pub async fn run() {
-    let mut loaded_plugins: Vec<plugins::Plugin> = Vec::new();
-
-    plugins::load_plugins(&mut loaded_plugins);
-
     let config = Config::load("config.toml").unwrap();
 
     let mut iterations = 0;
 
     loop {
-        match run_client(&config, &mut loaded_plugins).await {
+        match run_client(&config).await {
             Ok(_) => {
                 iterations = 0;
                 continue;
@@ -38,16 +38,44 @@ pub async fn run() {
             5 * iterations,
             iterations
         );
-        thread::sleep(Duration::from_secs(5 * iterations));
+        tokio::time::sleep(Duration::from_secs(5 * iterations)).await;
     }
 }
 
-async fn run_client(
-    config: &Config,
-    loaded_plugins: &mut Vec<plugins::Plugin>,
-) -> Result<(), anyhow::Error> {
+async fn run_client(config: &Config) -> Result<(), anyhow::Error> {
     let mut client = Client::from_config(config.to_owned()).await?;
     client.identify()?;
+
+    let plugins: Arc<RwLock<Vec<plugins::Plugin>>> =
+        Arc::new(RwLock::new(unsafe { Plugin::load() }));
+    let plugins_ref = plugins.clone();
+    let reload_ref = plugins.clone();
+
+    let (tx, rx) = channel();
+    let _watcher = Plugin::watch(tx)?;
+
+    thread::spawn(move || {
+        println!("Watching file changes...");
+        for event in rx.iter() {
+            if event.unwrap().kind.is_access() {
+                continue;
+            }
+
+            println!("Plugin change detected!");
+            match rx.recv_timeout(Duration::from_secs(1)) {
+                Ok(Ok(_event)) => {
+                    let mut registry = reload_ref.write().unwrap();
+                    registry.clear();
+                    unsafe { Plugin::load() }.into_iter().for_each(|plugin| {
+                        println!("Loading {}...", plugin.name);
+                        registry.push(plugin);
+                    });
+                }
+                Ok(Err(e)) => eprintln!("Watch error: {:?}", e),
+                Err(_) => {} // timeout, continue looping
+            }
+        }
+    });
 
     let mut stream = client.stream()?;
 
@@ -73,7 +101,7 @@ async fn run_client(
 
         print!("{}", message);
 
-        match handle_incoming_message(&client, message, loaded_plugins) {
+        match handle_incoming_message(&client, message, plugins_ref.read().unwrap().clone()) {
             Ok(_) => continue,
             Err(e) => {
                 println!("Error handling message: {}", e);
@@ -88,7 +116,7 @@ async fn run_client(
 fn handle_incoming_message(
     client: &Client,
     message: Message,
-    loaded_plugins: &mut Vec<plugins::Plugin>,
+    loaded_plugins: Vec<Plugin>,
 ) -> Result<(), anyhow::Error> {
     let ref msg = match message.command {
         Command::PRIVMSG(ref _channel, ref msg) => msg,
@@ -145,7 +173,14 @@ fn handle_incoming_message(
     };
 
     // Catch commands that are handled by the bot itself
-    match handle_core_messages(respond_method, client, target, loaded_plugins, &author, cmd) {
+    match handle_core_messages(
+        respond_method,
+        client,
+        target,
+        &loaded_plugins,
+        &author,
+        cmd,
+    ) {
         true => return Ok(()),
         false => (),
     };
@@ -154,7 +189,7 @@ fn handle_incoming_message(
         respond_method,
         client,
         target,
-        loaded_plugins,
+        &loaded_plugins,
         &author,
         cmd,
         param,
@@ -167,8 +202,8 @@ fn handle_core_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
-    loaded_plugins: &mut Vec<plugins::Plugin>,
-    author: &str,
+    loaded_plugins: &Vec<plugins::Plugin>,
+    _author: &str,
     cmd: &str,
 ) -> bool {
     match cmd {
@@ -191,14 +226,6 @@ fn handle_core_messages(
 
             return true;
         }
-        "reload" => {
-            if author == "Dragon!~Dragon@administrator.swiftirc.net" {
-                loaded_plugins.clear();
-                plugins::load_plugins(loaded_plugins);
-            }
-
-            return true;
-        }
         _ => {}
     }
 
@@ -209,7 +236,7 @@ fn handle_plugin_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
-    loaded_plugins: &mut Vec<plugins::Plugin>,
+    loaded_plugins: &Vec<Plugin>,
     author: &str,
     cmd: &str,
     param: &str,

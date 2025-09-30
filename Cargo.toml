@@ -10,6 +10,7 @@ common = { git = "https://github.com/ryanwohara/reinze-lib-common.git", branch =
 futures = "0.3.31"
 irc = "1.1.0"
 libloading = "0.8.9"
+notify = "8.2.0"
 regex = "1.11.3"
 reqwest = { version = "0.12.23", features = ["json"] }
 select = "0.6.1"
