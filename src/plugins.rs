@@ -49,7 +49,7 @@ impl Plugin {
             println!("Loading plugin: {}", plugin.path().display());
 
             // Load the dynamic library
-            let lib = match Library::new(plugin.path()) {
+            let lib = match unsafe { Library::new(plugin.path()) } {
                 Ok(lib) => lib,
                 Err(e) => {
                     println!("Error loading plugin: {}", e);
@@ -64,7 +64,7 @@ impl Plugin {
                     query: *const c_char,
                     author: *const c_char,
                 ) -> *mut c_char,
-            > = match lib.get(b"exported\0") {
+            > = match unsafe { lib.get(b"exported\0") } {
                 Ok(exported) => exported,
                 Err(e) => {
                     println!("Error loading plugin: {}", e);
@@ -75,13 +75,13 @@ impl Plugin {
             let empty = CString::new("").unwrap().into_raw();
             // Call the `exported` function
             let raw_triggers = exported(empty, empty, empty);
-            let triggers = match CStr::from_ptr(raw_triggers).to_str() {
+            let triggers = match unsafe { CStr::from_ptr(raw_triggers).to_str() } {
                 Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
                 Err(_) => continue,
             };
 
             let raw_commands = exported(CString::new("help").unwrap().into_raw(), empty, empty);
-            let commands = match CStr::from_ptr(raw_commands).to_str() {
+            let commands = match unsafe { CStr::from_ptr(raw_commands).to_str() } {
                 Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
                 Err(_) => continue,
             };
