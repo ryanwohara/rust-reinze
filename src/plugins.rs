@@ -4,6 +4,7 @@ use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex, RwLock};
+use std::sync::mpsc::channel;
 
 #[derive(Clone)]
 pub struct PluginManager {
@@ -35,6 +36,27 @@ impl PluginManager {
         grave_ref.extend(old);
 
         Ok(self)
+    }
+
+    pub fn watch(&self) {
+        let (tx, rx) = channel();
+        println!("Watching plugin changes...");
+        let _watcher = Plugin::watch(tx);
+
+        loop {
+            let event = rx.recv();
+
+            match event {
+                Ok(Ok(e)) if e.kind.is_remove() || e.kind.is_create() => {
+                    println!("Plugin change detected! {} {}", if e.kind.is_remove() { "Removed" } else { "Created" }, e.paths.first().unwrap().to_string_lossy());
+                    self
+                        .reload(unsafe { Plugin::load() })
+                        .expect("Plugin loading error");
+                }
+                Ok(Err(_)) => continue,
+                _ => continue,
+            }
+        }
     }
 }
 
