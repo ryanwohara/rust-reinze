@@ -3,7 +3,6 @@ extern crate common;
 extern crate reqwest;
 extern crate select;
 
-use std::any::Any;
 use crate::plugins::{Plugin, PluginManager};
 use anyhow::Result;
 use futures::prelude::*;
