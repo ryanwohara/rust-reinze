@@ -3,6 +3,40 @@ use notify::{Event, RecommendedWatcher, RecursiveMode, Result as NotifyResult, W
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::c_char;
+use std::sync::{Arc, Mutex, RwLock};
+
+#[derive(Clone)]
+pub struct PluginManager {
+    pub active: Arc<RwLock<Vec<Plugin>>>,
+    pub grave: Arc<Mutex<Vec<Plugin>>>,
+}
+
+impl PluginManager {
+    pub fn new() -> Self {
+        Self {
+            active: Arc::new(RwLock::new(Vec::new())),
+            grave: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn reload(&self, new: Vec<Plugin>) -> Result<&Self, ()> {
+        let mut active_ref = match self.active.write() {
+            Ok(guard) => guard,
+            Err(_) => return Err(()),
+        };
+
+        let mut grave_ref = match self.grave.lock() {
+            Ok(guard) => guard,
+            Err(_) => return Err(()),
+        };
+
+        let old = std::mem::replace(&mut *active_ref, new);
+
+        grave_ref.extend(old);
+
+        Ok(self)
+    }
+}
 
 #[derive(Clone)]
 pub struct Plugin {
@@ -46,7 +80,6 @@ impl Plugin {
             if !["so", "dll", "dylib"].contains(&extension) {
                 continue;
             }
-            println!("Loading plugin: {}", plugin.path().display());
 
             // Load the dynamic library
             let lib = match unsafe { Library::new(plugin.path()) } {
@@ -85,8 +118,6 @@ impl Plugin {
                 Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
                 Err(_) => continue,
             };
-
-            println!("Commands: {:?}", commands);
 
             let loaded_plugin: Plugin = Plugin {
                 name: match plugin.path().to_str() {

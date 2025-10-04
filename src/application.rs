@@ -3,9 +3,8 @@ extern crate common;
 extern crate reqwest;
 extern crate select;
 
-use crate::plugins;
-
-use crate::plugins::Plugin;
+use std::any::Any;
+use crate::plugins::{Plugin, PluginManager};
 use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
@@ -14,103 +13,94 @@ use regex::Regex;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
 pub async fn run() {
     let config = Config::load("config.toml").unwrap();
 
-    let mut iterations = 0;
-
-    loop {
-        match run_client(&config).await {
-            Ok(_) => {
-                iterations = 0;
-                continue;
-            }
-            Err(e) => println!("Error running client: {}", e),
-        };
-        iterations += 1;
-        println!(
-            "Restarting in {} seconds (iterations: {})",
-            5 * iterations,
-            iterations
-        );
-        tokio::time::sleep(Duration::from_secs(5 * iterations)).await;
+    let plugin_manager = PluginManager::new();
+    let active_ref = plugin_manager.active.clone();
+    {
+        active_ref
+            .write()
+            .unwrap()
+            .extend(unsafe { Plugin::load() });
     }
-}
-
-async fn run_client(config: &Config) -> Result<(), anyhow::Error> {
-    let mut client = Client::from_config(config.to_owned()).await?;
-    client.identify()?;
-
-    let plugins: Arc<RwLock<Vec<plugins::Plugin>>> =
-        Arc::new(RwLock::new(unsafe { Plugin::load() }));
-    let plugins_ref = plugins.clone();
-    let reload_ref = plugins.clone();
-
-    let (tx, rx) = channel();
-    let _watcher = Plugin::watch(tx)?;
 
     thread::spawn(move || {
-        println!("Watching file changes...");
-        for event in rx.iter() {
-            if event.unwrap().kind.is_access() {
-                continue;
-            }
+        let (tx, rx) = channel();
+        println!("Watching plugin changes...");
+        let _watcher = Plugin::watch(tx);
 
-            println!("Plugin change detected!");
-            match rx.recv_timeout(Duration::from_secs(1)) {
-                Ok(Ok(_event)) => {
-                    let mut registry = reload_ref.write().unwrap();
-                    registry.clear();
-                    unsafe { Plugin::load() }.into_iter().for_each(|plugin| {
-                        println!("Loading {}...", plugin.name);
-                        registry.push(plugin);
-                    });
+        loop {
+            let event = rx.recv();
+
+            match event {
+                Ok(Ok(e)) if e.kind.is_remove() || e.kind.is_create() => {
+                    println!("Plugin change detected! {} {}", if e.kind.is_remove() { "Removed" } else { "Created" }, e.paths.first().unwrap().to_string_lossy());
+                    plugin_manager
+                        .reload(unsafe { Plugin::load() })
+                        .expect("Plugin loading error");
                 }
-                Ok(Err(e)) => eprintln!("Watch error: {:?}", e),
-                Err(_) => {} // timeout, continue looping
+                Ok(Err(_)) => continue,
+                _ => continue,
             }
         }
     });
 
-    let mut stream = client.stream()?;
+    run_client(&config, active_ref)
+        .await
+        .expect("Critical failure");
+}
 
-    thread::spawn(|| loop {
-        let now = chrono::Local::now();
-        let timestamp = now.format("%T").to_string();
-        println!("{}", timestamp);
-        thread::sleep(Duration::from_secs(60));
+async fn run_client(
+    config: &Config,
+    active: Arc<RwLock<Vec<Plugin>>>,
+) -> Result<(), anyhow::Error> {
+    let mut client = Client::from_config(config.to_owned()).await.unwrap();
+    client.identify().unwrap();
+
+    let mut stream = client.stream().unwrap();
+
+    thread::spawn(|| {
+        loop {
+            let now = chrono::Local::now();
+            let timestamp = now.format("%T").to_string();
+            println!("{}", timestamp);
+            thread::sleep(Duration::from_secs(60));
+        }
     });
 
     loop {
         let message = match stream.next().await {
             Some(Ok(message)) => message,
             Some(Err(e)) => {
-                println!("Error: {}", e);
+                eprintln!("Error: {}", e);
                 return Ok(());
             }
             None => {
-                println!("Stream closed");
+                eprintln!("Stream closed");
                 return Ok(());
             }
         };
 
         print!("{}", message);
 
-        match handle_incoming_message(&client, message, plugins_ref.read().unwrap().clone()) {
+        let rwlock = match active.read() {
+            Ok(g) => g,
+            _ => continue,
+        };
+
+        match handle_incoming_message(&client, message, rwlock.clone()) {
             Ok(_) => continue,
             Err(e) => {
-                println!("Error handling message: {}", e);
-                break;
+                eprintln!("Error handling message: {}", e);
+                continue;
             }
         };
     }
-
-    Ok(())
 }
 
 fn handle_incoming_message(
@@ -202,7 +192,7 @@ fn handle_core_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
-    loaded_plugins: &Vec<plugins::Plugin>,
+    loaded_plugins: &Vec<Plugin>,
     _author: &str,
     cmd: &str,
 ) -> bool {
