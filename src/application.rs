@@ -11,7 +11,6 @@ use libloading::{Library, Symbol};
 use regex::Regex;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::sync::mpsc::channel;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
