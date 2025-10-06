@@ -39,10 +39,11 @@ async fn run_client(
     config: &Config,
     active: Arc<RwLock<Vec<Plugin>>>,
 ) -> Result<(), anyhow::Error> {
-    let mut client = Client::from_config(config.to_owned()).await.unwrap();
-    client.identify().unwrap();
+    let mut client = Client::from_config(config.to_owned()).await?;
 
-    let mut stream = client.stream().unwrap();
+    client.identify()?;
+
+    let mut stream = client.stream()?;
 
     thread::spawn(|| {
         loop {
