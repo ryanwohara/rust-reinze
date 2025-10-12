@@ -19,13 +19,9 @@ pub async fn run() {
     let config = Config::load("config.toml").unwrap();
 
     let plugin_manager = PluginManager::new();
+    plugin_manager.reload().unwrap();
+
     let active_ref = plugin_manager.active.clone();
-    {
-        active_ref
-            .write()
-            .unwrap()
-            .extend(unsafe { Plugin::load() });
-    }
 
     thread::spawn(move || plugin_manager.watch());
 
