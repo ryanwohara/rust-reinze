@@ -103,7 +103,7 @@ fn handle_incoming_message(
         None => return Ok(()),
     };
 
-    let re = Regex::new(r"^([-+])([a-zA-Z\d]+)(?:\s+(.*))?$").unwrap();
+    let re = Regex::new(r"^([-+])([a-zA-Z\d-]+)(?:\s+(.*))?$").unwrap();
     let matched = match re.captures(msg) {
         Some(matched) => vec![matched],
         None => vec![],
