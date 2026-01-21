@@ -13,7 +13,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::time::Duration;
+use tokio::sync::mpsc;
 
 pub async fn run() {
     let config = Config::load("config.toml").unwrap();
@@ -35,48 +35,35 @@ async fn run_client(
     active: Arc<RwLock<Vec<Plugin>>>,
 ) -> Result<(), anyhow::Error> {
     let mut client = Client::from_config(config.to_owned()).await?;
-
     client.identify()?;
-
     let mut stream = client.stream()?;
 
-    thread::spawn(|| {
-        loop {
-            let now = chrono::Local::now();
-            let timestamp = now.format("%T").to_string();
-            println!("{}", timestamp);
-            thread::sleep(Duration::from_secs(60));
+    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
+
+    tokio::spawn(async move {
+        while let Some(message) = rx.recv().await {
+            let plugins = match active.read() {
+                Ok(g) => g,
+                _ => continue,
+            };
+
+            if let Err(e) = handle_incoming_message(&client, message, plugins.clone()) {
+                eprintln!("Error handling message: {}", e);
+            }
         }
     });
 
-    loop {
-        let message = match stream.next().await {
-            Some(Ok(message)) => message,
-            Some(Err(e)) => {
-                eprintln!("Error: {}", e);
-                return Ok(());
-            }
-            None => {
-                eprintln!("Stream closed");
-                return Ok(());
-            }
-        };
+    while let Some(Ok(message)) = stream.next().await {
+        print!(
+            "[{}] {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            message
+        );
 
-        print!("{}", message);
-
-        let rwlock = match active.read() {
-            Ok(g) => g,
-            _ => continue,
-        };
-
-        match handle_incoming_message(&client, message, rwlock.clone()) {
-            Ok(_) => continue,
-            Err(e) => {
-                eprintln!("Error handling message: {}", e);
-                continue;
-            }
-        };
+        tx.send(message).ok();
     }
+
+    Ok(())
 }
 
 fn handle_incoming_message(
