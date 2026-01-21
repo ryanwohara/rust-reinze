@@ -14,6 +14,7 @@ use std::os::raw::c_char;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use tokio::sync::mpsc;
+use tokio::task;
 
 pub async fn run() {
     let config = Config::load("config.toml").unwrap();
@@ -43,11 +44,11 @@ async fn run_client(
     tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
             let plugins = match active.read() {
-                Ok(g) => g,
+                Ok(g) => g.clone(),
                 _ => continue,
             };
 
-            if let Err(e) = handle_incoming_message(&client, message, plugins.clone()) {
+            if let Err(e) = handle_incoming_message(&client, message, plugins).await {
                 eprintln!("Error handling message: {}", e);
             }
         }
@@ -66,7 +67,7 @@ async fn run_client(
     Ok(())
 }
 
-fn handle_incoming_message(
+async fn handle_incoming_message(
     client: &Client,
     message: Message,
     loaded_plugins: Vec<Plugin>,
@@ -90,7 +91,7 @@ fn handle_incoming_message(
         None => return Ok(()),
     };
 
-    let re = Regex::new(r"^([-+])([a-zA-Z\d-]+)(?:\s+(.*))?$").unwrap();
+    let re = Regex::new(r"^([-+])([a-zA-Z\d-]+)(?:\s+(.*))?$")?;
     let matched = match re.captures(msg) {
         Some(matched) => vec![matched],
         None => vec![],
@@ -133,7 +134,9 @@ fn handle_incoming_message(
         &loaded_plugins,
         &author,
         cmd,
-    ) {
+    )
+    .await
+    {
         true => return Ok(()),
         false => (),
     };
@@ -146,12 +149,13 @@ fn handle_incoming_message(
         &author,
         cmd,
         param,
-    );
+    )
+    .await;
 
     Ok(())
 }
 
-fn handle_core_messages(
+async fn handle_core_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
@@ -185,7 +189,7 @@ fn handle_core_messages(
     false
 }
 
-fn handle_plugin_messages(
+async fn handle_plugin_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
@@ -218,39 +222,53 @@ fn handle_plugin_messages(
                 }
             };
 
-            // Load the "exported" function from the plugin
-            let exported: Symbol<
-                extern "C" fn(
-                    command: *const c_char,
-                    query: *const c_char,
-                    author: *const c_char,
-                ) -> *mut c_char,
-            > = match unsafe { lib.get(b"exported\0") } {
-                Ok(exported) => exported,
-                Err(e) => {
-                    println!("Error loading plugin: {}", e);
-                    continue;
-                }
-            };
-
-            // Convert the command, query, and author to C strings
-            let cstr_cmd = match CString::new(cmd) {
-                Ok(cmd) => cmd.into_raw(),
-                Err(_) => continue,
-            };
-            let cstr_param = match CString::new(param) {
-                Ok(param) => param.into_raw(),
-                Err(_) => continue,
-            };
-            let cstr_author = match CString::new(author.to_owned()) {
-                Ok(author) => author.into_raw(),
-                Err(_) => continue,
-            };
+            let author = author.to_string();
+            let cmd = cmd.to_string();
+            let param = param.to_string();
 
             // Pass the command, query, and author to the plugin
-            let raw_result = exported(cstr_cmd, cstr_param, cstr_author);
-            let results = match unsafe { CStr::from_ptr(raw_result).to_str() } {
-                Ok(result) => result.split("\n").map(|s| s.to_string()),
+            let results = match task::spawn_blocking(move || unsafe {
+                // Load the "exported" function from the plugin
+                let exported: Symbol<
+                    extern "C" fn(
+                        command: *const c_char,
+                        query: *const c_char,
+                        author: *const c_char,
+                    ) -> *mut c_char,
+                > = match lib.get(b"exported\0") {
+                    Ok(exported) => exported,
+                    Err(e) => {
+                        println!("Error loading plugin: {}", e);
+                        return vec!["".to_string()];
+                    }
+                };
+                // Convert the command, query, and author to C strings
+                let cstr_cmd = match CString::new(cmd) {
+                    Ok(cmd) => cmd.into_raw(),
+                    Err(_) => return vec!["".to_string()],
+                };
+                let cstr_param = match CString::new(param) {
+                    Ok(param) => param.into_raw(),
+                    Err(_) => return vec!["".to_string()],
+                };
+                let cstr_author = match CString::new(author.to_owned()) {
+                    Ok(author) => author.into_raw(),
+                    Err(_) => return vec!["".to_string()],
+                };
+
+                let raw_results = exported(cstr_cmd, cstr_param, cstr_author);
+
+                match CStr::from_ptr(raw_results).to_str() {
+                    Ok(results) => results
+                        .split("\n")
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>(),
+                    _ => return vec!["".to_string()],
+                }
+            })
+            .await
+            {
+                Ok(r) => r,
                 Err(_) => continue,
             };
 
