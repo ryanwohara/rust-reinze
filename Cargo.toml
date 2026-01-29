@@ -15,4 +15,3 @@ regex = "1.12.2"
 reqwest = { version = "0.13.1", features = ["json"] }
 select = "0.6.1"
 tokio = { version = "1.49.0", features = ["full"] }
-libc = "0.2.179"

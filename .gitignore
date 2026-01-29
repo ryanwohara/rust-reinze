@@ -6,3 +6,4 @@
 /plugins/*.dll
 /plugins/*.dylink
 /lib/*.json
+/conf/*.toml

@@ -16,8 +16,8 @@ use std::thread;
 use tokio::sync::mpsc;
 use tokio::task;
 
-pub async fn run() {
-    let config = Config::load("config.toml").unwrap();
+pub async fn run(path: &str) {
+    let config = Config::load(path).unwrap();
 
     let plugin_manager = PluginManager::new();
     plugin_manager.reload().unwrap();
@@ -98,7 +98,7 @@ async fn handle_incoming_message(
     };
 
     // if the regex match fails, just return
-    if matched.len() == 0 {
+    if matched.is_empty() {
         return Ok(());
     }
     let trigger = match matched[0].get(1) {
