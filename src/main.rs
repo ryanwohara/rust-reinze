@@ -12,9 +12,7 @@ use tokio;
 
 #[tokio::main]
 async fn main() {
-    let dir = read_dir(Path::new("conf/")).unwrap();
-
-    for entry in dir {
+    for entry in read_dir(Path::new("conf/")).unwrap() {
         let path = entry.unwrap().path();
         let str = path.to_str().unwrap().to_string();
 
