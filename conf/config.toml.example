@@ -1,3 +1,4 @@
 nickname = "RustKick"
 server = "fiery.swiftirc.net"
 channels = ["#asdfghj", "#rshelp"]
+umodes = "+B"

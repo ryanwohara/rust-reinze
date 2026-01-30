@@ -110,7 +110,7 @@ async fn handle_incoming_message(
         None => "",
     };
     let param = match matched[0].get(3) {
-        Some(s) => s.as_str(),
+        Some(s) => s.as_str().trim(),
         None => "",
     };
 
@@ -273,7 +273,7 @@ async fn handle_plugin_messages(
             };
 
             for line in results {
-                if line.len() == 0 {
+                if line.is_empty() {
                     continue;
                 }
                 respond_method(&client, target, &line);
@@ -318,7 +318,7 @@ fn process_message(
 ) -> bool {
     let mut output: Vec<&str> = Vec::new();
 
-    let words = message.split(" ");
+    let words = message.split_whitespace();
 
     for word in words {
         output.push(word);
@@ -333,7 +333,7 @@ fn process_message(
         }
     }
 
-    if output.len() > 0 {
+    if output.is_empty() {
         match function(client, target, &output.join(" ")) {
             true => (),
             false => return false,
