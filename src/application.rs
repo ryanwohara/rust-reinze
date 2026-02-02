@@ -333,7 +333,7 @@ fn process_message(
         }
     }
 
-    if output.is_empty() {
+    if !output.is_empty() {
         match function(client, target, &output.join(" ")) {
             true => (),
             false => return false,
