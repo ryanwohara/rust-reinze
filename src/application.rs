@@ -48,8 +48,8 @@ async fn run_client(
                 _ => continue,
             };
 
-            if let Err(e) = handle_incoming_message(&client, message, plugins).await {
-                eprintln!("Error handling message: {}", e);
+            if !handle_incoming_message(&client, &message, plugins).await {
+                eprintln!("Error handling message: {}", message.to_string());
             }
         }
     });
@@ -69,18 +69,18 @@ async fn run_client(
 
 async fn handle_incoming_message(
     client: &Client,
-    message: Message,
+    message: &Message,
     loaded_plugins: Vec<Plugin>,
-) -> Result<(), anyhow::Error> {
+) -> bool {
     let ref msg = match message.command {
         Command::PRIVMSG(ref _channel, ref msg) => msg,
         Command::NOTICE(ref _channel, ref msg) => msg,
-        _ => return Ok(()),
+        _ => return true,
     };
 
     let prefix = match message.prefix {
         Some(ref prefix) => prefix,
-        None => return Ok(()),
+        None => return true,
     };
 
     let author = prefix.to_string();
@@ -88,10 +88,10 @@ async fn handle_incoming_message(
 
     let response_target = match message.response_target() {
         Some(target) => target,
-        None => return Ok(()),
+        None => return true,
     };
 
-    let re = Regex::new(r"^([-+])([a-zA-Z\d-]+)(?:\s+(.*))?$")?;
+    let re = Regex::new(r"^([-+])([a-zA-Z\d-]+)(?:\s+(.*))?$").unwrap();
     let matched = match re.captures(msg) {
         Some(matched) => vec![matched],
         None => vec![],
@@ -99,8 +99,9 @@ async fn handle_incoming_message(
 
     // if the regex match fails, just return
     if matched.is_empty() {
-        return Ok(());
+        return true;
     }
+
     let trigger = match matched[0].get(1) {
         Some(s) => s.as_str(),
         None => "",
@@ -115,9 +116,8 @@ async fn handle_incoming_message(
     };
 
     let respond_method: fn(&Client, &str, &str) -> bool = match trigger {
-        "+" => process_privmsg,
         "-" => process_notice,
-        _ => process_privmsg,
+        "+" | _ => process_privmsg,
     };
 
     let target = match trigger {
@@ -127,7 +127,7 @@ async fn handle_incoming_message(
     };
 
     // Catch commands that are handled by the bot itself
-    match handle_core_messages(
+    handle_core_messages(
         respond_method,
         client,
         target,
@@ -136,23 +136,16 @@ async fn handle_incoming_message(
         cmd,
     )
     .await
-    {
-        true => return Ok(()),
-        false => (),
-    };
-
-    handle_plugin_messages(
-        respond_method,
-        client,
-        target,
-        &loaded_plugins,
-        &author,
-        cmd,
-        param,
-    )
-    .await;
-
-    Ok(())
+        || handle_plugin_messages(
+            respond_method,
+            client,
+            target,
+            &loaded_plugins,
+            &author,
+            cmd,
+            param,
+        )
+        .await
 }
 
 async fn handle_core_messages(
@@ -197,7 +190,7 @@ async fn handle_plugin_messages(
     author: &str,
     cmd: &str,
     param: &str,
-) {
+) -> bool {
     // Catch commands that are handled by plugins
     for plugin in loaded_plugins {
         for command in &plugin.triggers {
@@ -280,6 +273,8 @@ async fn handle_plugin_messages(
             }
         }
     }
+
+    true
 }
 
 fn process_privmsg(client: &Client, target: &str, message: &str) -> bool {
@@ -319,26 +314,20 @@ fn process_message(
     let mut output: Vec<&str> = Vec::new();
 
     let words = message.split_whitespace();
+    let flush = |out: &mut Vec<&str>| {
+        let joined = out.join(" ");
+        let ok = function(client, target, &joined);
+        out.clear();
+        ok
+    };
 
     for word in words {
         output.push(word);
 
-        if output.join(" ").len() >= 400 {
-            match function(client, target, &output.join(" ")) {
-                true => (),
-                false => return false,
-            };
-
-            output.clear();
+        if output.join(" ").len() >= 400 && !flush(&mut output) {
+            return false;
         }
     }
 
-    if !output.is_empty() {
-        match function(client, target, &output.join(" ")) {
-            true => (),
-            false => return false,
-        };
-    }
-
-    true
+    !output.is_empty() && flush(&mut output)
 }
