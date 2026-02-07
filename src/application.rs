@@ -13,31 +13,38 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::{Arc, RwLock};
 use std::thread;
+use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::task;
+use tokio::{task, time};
 
 pub async fn run(path: &str) {
     let config = Config::load(path).unwrap();
+    let mut interval = 1;
 
-    let plugin_manager = PluginManager::new();
-    plugin_manager.reload().unwrap();
+    loop {
+        let plugin_manager = PluginManager::new();
+        plugin_manager.reload().unwrap();
 
-    let active_ref = plugin_manager.active.clone();
+        let active_ref = plugin_manager.active.clone();
 
-    thread::spawn(move || plugin_manager.watch());
+        thread::spawn(move || plugin_manager.watch());
 
-    run_client(&config, active_ref)
-        .await
-        .expect("Critical failure");
+        _ = run_client(&config, active_ref).await;
+
+        eprintln!(
+            "Disconnected. Waiting {} secs before trying again...",
+            interval
+        );
+
+        time::sleep(Duration::from_secs(interval)).await;
+        interval = 2 * interval;
+    }
 }
 
-async fn run_client(
-    config: &Config,
-    active: Arc<RwLock<Vec<Plugin>>>,
-) -> Result<(), anyhow::Error> {
-    let mut client = Client::from_config(config.to_owned()).await?;
-    client.identify()?;
-    let mut stream = client.stream()?;
+async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) -> bool {
+    let mut client = Client::from_config(config.to_owned()).await.unwrap();
+    client.identify().unwrap();
+    let mut stream = client.stream().unwrap();
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
@@ -54,7 +61,7 @@ async fn run_client(
         }
     });
 
-    while let Some(Ok(message)) = stream.next().await {
+    while let Ok(Some(message)) = stream.next().await.transpose() {
         print!(
             "[{}] {}",
             chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
@@ -64,7 +71,7 @@ async fn run_client(
         tx.send(message).ok();
     }
 
-    Ok(())
+    false
 }
 
 async fn handle_incoming_message(
@@ -121,9 +128,8 @@ async fn handle_incoming_message(
     };
 
     let target = match trigger {
-        "+" => response_target,
         "-" => &nick,
-        _ => response_target,
+        "+" | _ => response_target,
     };
 
     // Catch commands that are handled by the bot itself
@@ -158,28 +164,20 @@ async fn handle_core_messages(
 ) -> bool {
     match cmd {
         "help" => {
-            let mut commands: Vec<&str> = Vec::new();
+            let commands = loaded_plugins
+                .iter()
+                .map(|plugin| plugin.commands.to_owned())
+                .flatten()
+                .collect::<Vec<String>>();
 
-            for plugin in loaded_plugins {
-                for command in &plugin.commands {
-                    commands.push(command);
-                }
-            }
-
-            let output = format!(
-                "{} {}",
-                common::l("Commands"),
-                common::c1(&commands.join(", "))
-            );
+            let output = vec![common::l("Commands"), common::c1(&commands.join(", "))].join(" ");
 
             respond_method(&client, target, &output);
 
-            return true;
+            true
         }
-        _ => {}
+        _ => false,
     }
-
-    false
 }
 
 async fn handle_plugin_messages(
