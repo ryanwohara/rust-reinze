@@ -4,7 +4,6 @@ extern crate reqwest;
 extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
-use anyhow::Result;
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
@@ -17,8 +16,11 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::{task, time};
 
-pub async fn run(path: &str) {
-    let config = Config::load(path).unwrap();
+pub async fn run<T>(path: T)
+where
+    T: ToString,
+{
+    let config = Config::load(path.to_string()).unwrap();
     let mut interval = 1;
 
     loop {
@@ -29,7 +31,15 @@ pub async fn run(path: &str) {
 
         thread::spawn(move || plugin_manager.watch());
 
-        _ = run_client(&config, active_ref).await;
+        let before = time::Instant::now();
+        run_client(&config, active_ref).await;
+        let after = time::Instant::now();
+        let difference = after - before;
+        interval = if difference.as_secs() > 300 {
+            1
+        } else {
+            interval
+        };
 
         eprintln!(
             "Disconnected. Waiting {} secs before trying again...",
@@ -41,7 +51,7 @@ pub async fn run(path: &str) {
     }
 }
 
-async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) -> bool {
+async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) {
     let mut client = Client::from_config(config.to_owned()).await.unwrap();
     client.identify().unwrap();
     let mut stream = client.stream().unwrap();
@@ -70,8 +80,6 @@ async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) -> bool {
 
         tx.send(message).ok();
     }
-
-    false
 }
 
 async fn handle_incoming_message(
