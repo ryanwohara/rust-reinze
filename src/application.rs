@@ -99,8 +99,8 @@ async fn handle_incoming_message(
         None => return true,
     };
 
-    let author = prefix.to_string();
-    let nick: String = author.split("!").collect::<Vec<&str>>()[0].to_string();
+    let author = Author::create(prefix);
+    let nick: String = author.nick.to_string();
 
     let response_target = match message.response_target() {
         Some(target) => target,
@@ -141,24 +141,16 @@ async fn handle_incoming_message(
         "+" | _ => response_target,
     };
 
-    let author = Author::create(author);
+    let plugin_author = Author::create(prefix);
 
     // Catch commands that are handled by the bot itself
-    handle_core_messages(
-        respond_method,
-        client,
-        target,
-        &loaded_plugins,
-        author.clone(),
-        cmd,
-    )
-    .await
+    handle_core_messages(respond_method, client, target, &loaded_plugins, author, cmd).await
         || handle_plugin_messages(
             respond_method,
             client,
             target,
             &loaded_plugins,
-            author,
+            plugin_author,
             cmd,
             param,
         )
@@ -228,7 +220,7 @@ async fn handle_plugin_messages(
                 }
             };
 
-            let author = author.to_string();
+            let host = author.full.to_string();
             let cmd = cmd.to_string();
             let param = param.to_string();
 
@@ -257,7 +249,7 @@ async fn handle_plugin_messages(
                     Ok(param) => param.into_raw(),
                     Err(_) => return vec!["".to_string()],
                 };
-                let cstr_author = match CString::new(author.to_owned()) {
+                let cstr_author = match CString::new(host) {
                     Ok(author) => author.into_raw(),
                     Err(_) => return vec!["".to_string()],
                 };
