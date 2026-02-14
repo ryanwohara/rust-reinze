@@ -11,7 +11,7 @@ use std::path::Path;
 use tokio;
 use tokio::task::JoinHandle;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let mut threads = vec![];
 

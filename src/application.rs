@@ -5,6 +5,7 @@ extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
 use common::author::Author;
+use common::{c1, l};
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
@@ -162,9 +163,11 @@ async fn handle_core_messages(
     client: &Client,
     target: &str,
     loaded_plugins: &Vec<Plugin>,
-    author: Author,
+    _author: Author,
     cmd: &str,
 ) -> bool {
+    let target = target.to_string();
+
     match cmd {
         "help" => {
             let commands = loaded_plugins
@@ -173,13 +176,8 @@ async fn handle_core_messages(
                 .flatten()
                 .collect::<Vec<String>>();
 
-            let output = task::spawn_blocking(move || {
-                vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ")
-            })
-            .await
-            .unwrap();
-
-            respond_method(&client, target, &output);
+            let output = vec![l("Commands"), c1(&commands.join(", "))].join(" ");
+            respond_method(client, &target, &output);
 
             true
         }
@@ -266,7 +264,7 @@ async fn handle_plugin_messages(
             })
             .await
             {
-                Ok(r) => r,
+                Ok(result) => result,
                 Err(_) => continue,
             };
 
