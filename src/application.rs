@@ -181,7 +181,9 @@ async fn handle_core_messages(
                 .flatten()
                 .collect::<Vec<String>>();
 
-            let output = vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ");
+            let output = task::block_in_place(|| {
+                vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ")
+            });
 
             respond_method(&client, target, &output);
 
