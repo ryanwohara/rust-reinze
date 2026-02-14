@@ -4,6 +4,7 @@ extern crate reqwest;
 extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
+use common::author::Author;
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
@@ -167,9 +168,11 @@ async fn handle_core_messages(
     client: &Client,
     target: &str,
     loaded_plugins: &Vec<Plugin>,
-    _author: &str,
+    a: &str,
     cmd: &str,
 ) -> bool {
+    let author = Author::create(a);
+
     match cmd {
         "help" => {
             let commands = loaded_plugins
@@ -178,7 +181,7 @@ async fn handle_core_messages(
                 .flatten()
                 .collect::<Vec<String>>();
 
-            let output = vec![common::l("Commands"), common::c1(&commands.join(", "))].join(" ");
+            let output = vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ");
 
             respond_method(&client, target, &output);
 
