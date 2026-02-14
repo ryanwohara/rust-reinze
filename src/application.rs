@@ -141,13 +141,15 @@ async fn handle_incoming_message(
         "+" | _ => response_target,
     };
 
+    let author = Author::create(author);
+
     // Catch commands that are handled by the bot itself
     handle_core_messages(
         respond_method,
         client,
         target,
         &loaded_plugins,
-        &author,
+        author.clone(),
         cmd,
     )
     .await
@@ -156,7 +158,7 @@ async fn handle_incoming_message(
             client,
             target,
             &loaded_plugins,
-            &author,
+            author,
             cmd,
             param,
         )
@@ -168,11 +170,9 @@ async fn handle_core_messages(
     client: &Client,
     target: &str,
     loaded_plugins: &Vec<Plugin>,
-    a: &str,
+    author: Author,
     cmd: &str,
 ) -> bool {
-    let author = Author::create(a);
-
     match cmd {
         "help" => {
             let commands = loaded_plugins
@@ -200,7 +200,7 @@ async fn handle_plugin_messages(
     client: &Client,
     target: &str,
     loaded_plugins: &Vec<Plugin>,
-    author: &str,
+    author: Author,
     cmd: &str,
     param: &str,
 ) -> bool {
