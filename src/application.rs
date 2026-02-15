@@ -5,7 +5,6 @@ extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
 use common::author::Author;
-use common::{c1, l};
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
@@ -142,50 +141,19 @@ async fn handle_incoming_message(
         "+" | _ => response_target,
     };
 
-    let plugin_author = Author::create(prefix);
-
-    // Catch commands that are handled by the bot itself
-    handle_core_messages(respond_method, client, target, &loaded_plugins, author, cmd).await
-        || handle_plugin_messages(
-            respond_method,
-            client,
-            target,
-            &loaded_plugins,
-            plugin_author,
-            cmd,
-            param,
-        )
-        .await
+    handle_messages(
+        respond_method,
+        client,
+        target,
+        &loaded_plugins,
+        author,
+        cmd,
+        param,
+    )
+    .await
 }
 
-async fn handle_core_messages(
-    respond_method: fn(&Client, &str, &str) -> bool,
-    client: &Client,
-    target: &str,
-    loaded_plugins: &Vec<Plugin>,
-    _author: Author,
-    cmd: &str,
-) -> bool {
-    let target = target.to_string();
-
-    match cmd {
-        "help" => {
-            let commands = loaded_plugins
-                .iter()
-                .map(|plugin| plugin.commands.to_owned())
-                .flatten()
-                .collect::<Vec<String>>();
-
-            let output = vec![l("Commands"), c1(&commands.join(", "))].join(" ");
-            respond_method(client, &target, &output);
-
-            true
-        }
-        _ => false,
-    }
-}
-
-async fn handle_plugin_messages(
+async fn handle_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
@@ -194,6 +162,27 @@ async fn handle_plugin_messages(
     cmd: &str,
     param: &str,
 ) -> bool {
+    match cmd {
+        "help" => {
+            let commands = loaded_plugins
+                .iter()
+                .map(|plugin| plugin.commands.to_owned())
+                .flatten()
+                .collect::<Vec<String>>();
+
+            let output = task::spawn_blocking(move || {
+                vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ")
+            })
+            .await
+            .unwrap();
+
+            respond_method(client, &target, &output);
+
+            return true;
+        }
+        _ => (),
+    };
+
     // Catch commands that are handled by plugins
     for plugin in loaded_plugins {
         for command in &plugin.triggers {
