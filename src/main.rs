@@ -6,6 +6,7 @@ extern crate common;
 extern crate reqwest;
 extern crate select;
 
+use common::author::cache::{color_ffi, init};
 use std::fs::read_dir;
 use std::path::Path;
 use tokio;
@@ -14,6 +15,7 @@ use tokio::task::JoinHandle;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let mut threads = vec![];
+    init().await;
 
     for entry in read_dir(Path::new("conf/")).unwrap() {
         let path = entry.unwrap().path();
@@ -21,7 +23,8 @@ async fn main() {
 
         if path.is_file() && str.ends_with(".toml") {
             let string = str.to_string();
-            let thread = tokio::spawn(async move { application::run(&str.to_owned()).await });
+            let thread =
+                tokio::spawn(async move { application::run(&str.to_owned(), color_ffi).await });
             threads.push(Thread { thread, string });
         }
     }
@@ -43,7 +46,7 @@ async fn main() {
                 let string = str.as_ref().unwrap().to_string();
                 threads.push(Thread {
                     string: string.to_string(),
-                    thread: tokio::spawn(async move { application::run(string).await }),
+                    thread: tokio::spawn(async move { application::run(string, color_ffi).await }),
                 })
             }
         });

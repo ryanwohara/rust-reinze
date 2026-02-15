@@ -4,9 +4,8 @@ extern crate reqwest;
 extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
-use common::PluginContext;
 use common::author::Author;
-use common::author::cache::{color_ffi, init};
+use common::{ColorResult, PluginContext};
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
@@ -19,7 +18,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
 
-pub async fn run<T>(path: T)
+pub async fn run<T>(path: T, color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult)
 where
     T: ToString,
 {
@@ -35,7 +34,7 @@ where
         thread::spawn(move || plugin_manager.watch());
 
         let before = time::Instant::now();
-        run_client(&config, active_ref).await;
+        run_client(&config, active_ref, color_ffi).await;
         let after = time::Instant::now();
         let difference = after - before;
         interval = if difference.as_secs() > 300 {
@@ -54,7 +53,11 @@ where
     }
 }
 
-async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) {
+async fn run_client(
+    config: &Config,
+    active: Arc<RwLock<Vec<Plugin>>>,
+    color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult,
+) {
     let mut client = Client::from_config(config.to_owned()).await.unwrap();
     client.identify().unwrap();
     let mut stream = client.stream().unwrap();
@@ -62,15 +65,13 @@ async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) {
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
     tokio::spawn(async move {
-        init().await;
-
         while let Some(message) = rx.recv().await {
             let plugins = match active.read() {
                 Ok(g) => g.clone(),
                 _ => continue,
             };
 
-            if !handle_incoming_message(&client, &message, plugins).await {
+            if !handle_incoming_message(&client, &message, plugins, color_ffi).await {
                 eprintln!("Error handling message: {}", message.to_string());
             }
         }
@@ -91,6 +92,7 @@ async fn handle_incoming_message(
     client: &Client,
     message: &Message,
     loaded_plugins: Vec<Plugin>,
+    color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult,
 ) -> bool {
     let ref msg = match message.command {
         Command::PRIVMSG(ref _channel, ref msg) => msg,
