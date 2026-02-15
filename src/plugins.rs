@@ -1,3 +1,5 @@
+use common::PluginContext;
+use common::author::cache::color_ffi;
 use libloading::{Library, Symbol};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Result as NotifyResult, Watcher};
 use std::ffi::{CStr, CString};
@@ -32,30 +34,35 @@ impl PluginManager {
         };
 
         // Get a reference to the `exported` function
-        let exported: Symbol<
-            extern "C" fn(
-                command: *const c_char,
-                query: *const c_char,
-                author: *const c_char,
-            ) -> *mut c_char,
-        > = match unsafe { lib.get(b"exported\0") } {
-            Ok(exported) => exported,
-            Err(e) => {
-                println!("Error loading plugin: {}", e);
-                return;
-            }
-        };
+        let exported: Symbol<extern "C" fn(context: &PluginContext) -> *mut c_char> =
+            match unsafe { lib.get(b"exported\0") } {
+                Ok(exported) => exported,
+                Err(e) => {
+                    println!("Error loading plugin: {}", e);
+                    return;
+                }
+            };
 
         let empty = CString::new("").unwrap().into_raw();
         // Call the `exported` function
-        let raw_triggers = exported(empty, empty, empty);
+        let raw_triggers = exported(&PluginContext {
+            cmd: empty,
+            param: empty,
+            author: empty,
+            color: color_ffi,
+        });
 
         let triggers = match unsafe { CStr::from_ptr(raw_triggers).to_str() } {
             Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
             Err(_) => return,
         };
 
-        let raw_commands = exported(CString::new("help").unwrap().into_raw(), empty, empty);
+        let raw_commands = exported(&PluginContext {
+            cmd: CString::new("help").unwrap().into_raw(),
+            param: empty,
+            author: empty,
+            color: color_ffi,
+        });
         let commands = match unsafe { CStr::from_ptr(raw_commands).to_str() } {
             Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
             Err(_) => return,
@@ -66,7 +73,6 @@ impl PluginManager {
             commands,
             triggers,
         };
-
 
         self.active.write().unwrap().push(plugin);
     }
@@ -124,29 +130,35 @@ impl PluginManager {
             };
 
             // Get a reference to the `exported` function
-            let exported: Symbol<
-                extern "C" fn(
-                    command: *const c_char,
-                    query: *const c_char,
-                    author: *const c_char,
-                ) -> *mut c_char,
-            > = match unsafe { lib.get(b"exported\0") } {
-                Ok(exported) => exported,
-                Err(e) => {
-                    println!("Error loading plugin: {}", e);
-                    continue;
-                }
-            };
+            let exported: Symbol<extern "C" fn(context: &PluginContext) -> *mut c_char> =
+                match unsafe { lib.get(b"exported\0") } {
+                    Ok(exported) => exported,
+                    Err(e) => {
+                        println!("Error loading plugin: {}", e);
+                        continue;
+                    }
+                };
 
             let empty = CString::new("").unwrap().into_raw();
             // Call the `exported` function
-            let raw_triggers = exported(empty, empty, empty);
+            let raw_triggers = exported(&PluginContext {
+                cmd: empty,
+                param: empty,
+                author: empty,
+                color: color_ffi,
+            });
             let triggers = match unsafe { CStr::from_ptr(raw_triggers).to_str() } {
                 Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
                 Err(_) => continue,
             };
 
-            let raw_commands = exported(CString::new("help").unwrap().into_raw(), empty, empty);
+            let raw_commands = exported(&PluginContext {
+                cmd: CString::new("help").unwrap().into_raw(),
+                param: empty,
+                author: empty,
+                color: color_ffi,
+            });
+
             let commands = match unsafe { CStr::from_ptr(raw_commands).to_str() } {
                 Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
                 Err(_) => continue,

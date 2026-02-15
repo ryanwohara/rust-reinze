@@ -4,7 +4,9 @@ extern crate reqwest;
 extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
+use common::PluginContext;
 use common::author::Author;
+use common::author::cache::{color_ffi, init};
 use futures::prelude::*;
 use irc::client::prelude::*;
 use libloading::{Library, Symbol};
@@ -15,7 +17,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::{task, time};
+use tokio::time;
 
 pub async fn run<T>(path: T)
 where
@@ -60,6 +62,8 @@ async fn run_client(config: &Config, active: Arc<RwLock<Vec<Plugin>>>) {
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
     tokio::spawn(async move {
+        init().await;
+
         while let Some(message) = rx.recv().await {
             let plugins = match active.read() {
                 Ok(g) => g.clone(),
@@ -99,7 +103,7 @@ async fn handle_incoming_message(
         None => return true,
     };
 
-    let author = Author::create(prefix);
+    let author = Author::create(prefix, color_ffi);
     let nick: String = author.nick.to_string();
 
     let response_target = match message.response_target() {
@@ -170,11 +174,7 @@ async fn handle_messages(
                 .flatten()
                 .collect::<Vec<String>>();
 
-            let output = task::spawn_blocking(move || {
-                vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ")
-            })
-            .await
-            .unwrap();
+            let output = vec![author.l("Commands"), author.c1(&commands.join(", "))].join(" ");
 
             respond_method(client, &target, &output);
 
@@ -212,49 +212,53 @@ async fn handle_messages(
             let param = param.to_string();
 
             // Pass the command, query, and author to the plugin
-            let results = match task::spawn_blocking(move || unsafe {
+            let results = unsafe {
                 // Load the "exported" function from the plugin
-                let exported: Symbol<
-                    extern "C" fn(
-                        command: *const c_char,
-                        query: *const c_char,
-                        author: *const c_char,
-                    ) -> *mut c_char,
-                > = match lib.get(b"exported\0") {
-                    Ok(exported) => exported,
-                    Err(e) => {
-                        println!("Error loading plugin: {}", e);
-                        return vec!["".to_string()];
-                    }
-                };
+                let exported: Symbol<extern "C" fn(context: &PluginContext) -> *mut c_char> =
+                    match lib.get(b"exported\0") {
+                        Ok(exported) => exported,
+                        Err(e) => {
+                            println!("Error loading plugin: {}", e);
+                            return false;
+                        }
+                    };
                 // Convert the command, query, and author to C strings
                 let cstr_cmd = match CString::new(cmd) {
                     Ok(cmd) => cmd.into_raw(),
-                    Err(_) => return vec!["".to_string()],
+                    Err(_) => return false,
                 };
                 let cstr_param = match CString::new(param) {
                     Ok(param) => param.into_raw(),
-                    Err(_) => return vec!["".to_string()],
+                    Err(_) => return false,
                 };
                 let cstr_author = match CString::new(host) {
                     Ok(author) => author.into_raw(),
-                    Err(_) => return vec!["".to_string()],
+                    Err(_) => return false,
                 };
 
-                let raw_results = exported(cstr_cmd, cstr_param, cstr_author);
+                let context: PluginContext = PluginContext {
+                    cmd: cstr_cmd,
+                    param: cstr_param,
+                    author: cstr_author,
+                    color: author.color,
+                };
 
-                match CStr::from_ptr(raw_results).to_str() {
+                let raw_results = exported(&context);
+
+                let output = match CStr::from_ptr(raw_results).to_str() {
                     Ok(results) => results
                         .split("\n")
                         .map(|s| s.to_string())
                         .collect::<Vec<String>>(),
-                    _ => return vec!["".to_string()],
-                }
-            })
-            .await
-            {
-                Ok(result) => result,
-                Err(_) => continue,
+                    _ => vec![],
+                };
+
+                _ = CString::from_raw(raw_results);
+                _ = CString::from_raw(cstr_author);
+                _ = CString::from_raw(cstr_param);
+                _ = CString::from_raw(cstr_cmd);
+
+                output
             };
 
             for line in results {
