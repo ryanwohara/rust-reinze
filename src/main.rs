@@ -14,8 +14,9 @@ use tokio::task::JoinHandle;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
+    env_logger::init();
     let mut threads = vec![];
-    init().await;
+    init();
 
     for entry in read_dir(Path::new("conf/")).unwrap() {
         let path = entry.unwrap().path();
