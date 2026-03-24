@@ -88,6 +88,7 @@ pub fn parse_timer_declarations(output: &str) -> Vec<TimerDef> {
 pub fn spawn_timers(
     active: Arc<RwLock<Vec<Plugin>>>,
     color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult,
+    runtime: &tokio::runtime::Handle,
 ) -> Vec<JoinHandle<()>> {
     let plugins = match active.read() {
         Ok(guard) => guard.clone(),
@@ -110,7 +111,7 @@ pub fn spawn_timers(
                 command, plugin_path, interval
             );
 
-            let handle = tokio::spawn(async move {
+            let handle = runtime.spawn(async move {
                 loop {
                     tokio::time::sleep(interval).await;
                     run_timer_tick(&plugin_path, &command, color_ffi);
@@ -199,6 +200,7 @@ fn run_timer_tick(
 pub struct TimerManager {
     handles: Mutex<Vec<JoinHandle<()>>>,
     color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult,
+    runtime_handle: Mutex<Option<tokio::runtime::Handle>>,
 }
 
 impl TimerManager {
@@ -206,7 +208,13 @@ impl TimerManager {
         Self {
             handles: Mutex::new(vec![]),
             color_ffi,
+            runtime_handle: Mutex::new(None),
         }
+    }
+
+    /// Store the Tokio runtime handle so timers can be spawned from any thread.
+    pub fn set_runtime(&self, handle: tokio::runtime::Handle) {
+        *self.runtime_handle.lock().unwrap() = Some(handle);
     }
 
     /// Cancel all running timers and spawn new ones from the current plugin set.
@@ -215,8 +223,11 @@ impl TimerManager {
         for handle in handles.drain(..) {
             handle.abort();
         }
-        let new_handles = spawn_timers(active.clone(), self.color_ffi);
-        *handles = new_handles;
+        let runtime = self.runtime_handle.lock().unwrap();
+        if let Some(rt) = runtime.as_ref() {
+            let new_handles = spawn_timers(active.clone(), self.color_ffi, rt);
+            *handles = new_handles;
+        }
     }
 
     /// Cancel all running timers (used on disconnect).

@@ -226,6 +226,10 @@ impl PluginManager {
 
         grave_ref.extend(old);
 
+        // Drop locks before restarting timers — restart() needs to read-lock active
+        drop(active_ref);
+        drop(grave_ref);
+
         self.timer_manager.restart(&self.active);
 
         Ok(self)
