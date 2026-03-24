@@ -1,5 +1,6 @@
 mod application;
 mod plugins;
+mod timers;
 
 extern crate chrono;
 extern crate common;

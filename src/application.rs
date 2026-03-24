@@ -4,6 +4,7 @@ extern crate reqwest;
 extern crate select;
 
 use crate::plugins::{Plugin, PluginManager};
+use crate::timers::TimerManager;
 use common::author::Author;
 use common::{ColorResult, PluginContext};
 use futures::prelude::*;
@@ -26,15 +27,16 @@ where
     let mut interval = 1;
 
     loop {
-        let plugin_manager = PluginManager::new();
+        let plugin_manager = PluginManager::new(color_ffi);
         plugin_manager.reload().unwrap();
 
         let active_ref = plugin_manager.active.clone();
+        let timer_manager = plugin_manager.timer_manager.clone();
 
         thread::spawn(move || plugin_manager.watch());
 
         let before = time::Instant::now();
-        run_client(&config, active_ref, color_ffi).await;
+        run_client(&config, active_ref, timer_manager, color_ffi).await;
         let after = time::Instant::now();
         let difference = after - before;
         interval = if difference.as_secs() > 300 {
@@ -56,6 +58,7 @@ where
 async fn run_client(
     config: &Config,
     active: Arc<RwLock<Vec<Plugin>>>,
+    timer_manager: Arc<TimerManager>,
     color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult,
 ) {
     let mut client = Client::from_config(config.to_owned()).await.unwrap();
@@ -64,9 +67,10 @@ async fn run_client(
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
+    let active_for_messages = active.clone();
     tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
-            let plugins = match active.read() {
+            let plugins = match active_for_messages.read() {
                 Ok(g) => g.clone(),
                 _ => continue,
             };
@@ -86,6 +90,8 @@ async fn run_client(
 
         tx.send(message).ok();
     }
+
+    timer_manager.cancel_all();
 }
 
 async fn handle_incoming_message(

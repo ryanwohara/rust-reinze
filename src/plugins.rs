@@ -1,4 +1,5 @@
-use common::PluginContext;
+use crate::timers::{TimerDef, TimerManager, parse_timer_declarations};
+use common::{ColorResult, PluginContext};
 use common::author::cache::color_ffi;
 use libloading::{Library, Symbol};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Result as NotifyResult, Watcher};
@@ -12,13 +13,15 @@ use std::sync::{Arc, Mutex, RwLock};
 pub struct PluginManager {
     pub active: Arc<RwLock<Vec<Plugin>>>,
     pub grave: Arc<Mutex<Vec<Plugin>>>,
+    pub timer_manager: Arc<TimerManager>,
 }
 
 impl PluginManager {
-    pub fn new() -> Self {
+    pub fn new(color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult) -> Self {
         Self {
             active: Arc::new(RwLock::new(Vec::new())),
             grave: Arc::new(Mutex::new(Vec::new())),
+            timer_manager: Arc::new(TimerManager::new(color_ffi)),
         }
     }
 
@@ -68,13 +71,26 @@ impl PluginManager {
             Err(_) => return,
         };
 
+        let raw_timers = exported(&PluginContext {
+            cmd: CString::new("timers").unwrap().into_raw(),
+            param: empty,
+            author: empty,
+            color: color_ffi,
+        });
+        let timers = match unsafe { CStr::from_ptr(raw_timers).to_str() } {
+            Ok(timers_str) => parse_timer_declarations(timers_str),
+            Err(_) => vec![],
+        };
+
         let plugin: Plugin = Plugin {
             name: path.to_string(),
             commands,
             triggers,
+            timers,
         };
 
         self.active.write().unwrap().push(plugin);
+        self.timer_manager.restart(&self.active);
     }
 
     pub fn reload(&self) -> Result<&Self, ()> {
@@ -164,6 +180,17 @@ impl PluginManager {
                 Err(_) => continue,
             };
 
+            let raw_timers = exported(&PluginContext {
+                cmd: CString::new("timers").unwrap().into_raw(),
+                param: empty,
+                author: empty,
+                color: color_ffi,
+            });
+            let timers = match unsafe { CStr::from_ptr(raw_timers).to_str() } {
+                Ok(timers_str) => parse_timer_declarations(timers_str),
+                Err(_) => vec![],
+            };
+
             let name = match plugin.path().to_str() {
                 Some(name) => name.to_string(),
                 None => continue,
@@ -173,6 +200,7 @@ impl PluginManager {
                 name,
                 commands,
                 triggers,
+                timers,
             };
 
             println!(
@@ -181,12 +209,24 @@ impl PluginManager {
                 loaded_plugin.commands.join(", ")
             );
 
+            if !loaded_plugin.timers.is_empty() {
+                println!(
+                    "\tTimers: {}",
+                    loaded_plugin.timers.iter()
+                        .map(|t| format!("{}:{:?}", t.command, t.interval))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+
             new.push(loaded_plugin);
         }
 
         let old = std::mem::replace(&mut *active_ref, new);
 
         grave_ref.extend(old);
+
+        self.timer_manager.restart(&self.active);
 
         Ok(self)
     }
@@ -231,6 +271,7 @@ pub struct Plugin {
     pub name: String,
     pub commands: Vec<String>,
     pub triggers: Vec<String>,
+    pub timers: Vec<TimerDef>,
 }
 
 const PATH: &str = "plugins/";
