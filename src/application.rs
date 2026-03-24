@@ -28,7 +28,9 @@ where
 
     loop {
         let plugin_manager = PluginManager::new(color_ffi);
-        plugin_manager.timer_manager.set_runtime(tokio::runtime::Handle::current());
+        plugin_manager
+            .timer_manager
+            .set_runtime(tokio::runtime::Handle::current());
         plugin_manager.reload().unwrap();
 
         let active_ref = plugin_manager.active.clone();

@@ -145,7 +145,10 @@ fn run_timer_tick(
             match lib.get(b"exported\0") {
                 Ok(exported) => exported,
                 Err(e) => {
-                    error!("Timer: error loading 'exported' from '{}': {}", plugin_path, e);
+                    error!(
+                        "Timer: error loading 'exported' from '{}': {}",
+                        plugin_path, e
+                    );
                     return;
                 }
             };
@@ -194,7 +197,6 @@ fn run_timer_tick(
         }
     }
 }
-
 
 /// Manages timer lifecycle, supporting hot-reload and clean shutdown.
 pub struct TimerManager {

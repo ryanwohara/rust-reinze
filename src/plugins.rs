@@ -1,6 +1,6 @@
 use crate::timers::{TimerDef, TimerManager, parse_timer_declarations};
-use common::{ColorResult, PluginContext};
 use common::author::cache::color_ffi;
+use common::{ColorResult, PluginContext};
 use libloading::{Library, Symbol};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Result as NotifyResult, Watcher};
 use std::ffi::{CStr, CString};
@@ -212,7 +212,9 @@ impl PluginManager {
             if !loaded_plugin.timers.is_empty() {
                 println!(
                     "\tTimers: {}",
-                    loaded_plugin.timers.iter()
+                    loaded_plugin
+                        .timers
+                        .iter()
                         .map(|t| format!("{}:{:?}", t.command, t.interval))
                         .collect::<Vec<_>>()
                         .join(", ")
