@@ -53,6 +53,7 @@ impl PluginManager {
             param: empty,
             author: empty,
             color: color_ffi,
+            channel: empty,
         });
 
         let triggers = match unsafe { CStr::from_ptr(raw_triggers).to_str() } {
@@ -65,6 +66,7 @@ impl PluginManager {
             param: empty,
             author: empty,
             color: color_ffi,
+            channel: empty,
         });
         let commands = match unsafe { CStr::from_ptr(raw_commands).to_str() } {
             Ok(commands) => commands.split("\n").map(|s| s.to_string()).collect(),
@@ -76,6 +78,7 @@ impl PluginManager {
             param: empty,
             author: empty,
             color: color_ffi,
+            channel: empty,
         });
         let timers = match unsafe { CStr::from_ptr(raw_timers).to_str() } {
             Ok(timers_str) => parse_timer_declarations(timers_str),
@@ -162,6 +165,7 @@ impl PluginManager {
                 param: empty,
                 author: empty,
                 color: color_ffi,
+                channel: empty,
             });
             let triggers = match unsafe { CStr::from_ptr(raw_triggers).to_str() } {
                 Ok(triggers) => triggers.split("\n").map(|s| s.to_string()).collect(),
@@ -173,6 +177,7 @@ impl PluginManager {
                 param: empty,
                 author: empty,
                 color: color_ffi,
+                channel: empty,
             });
 
             let commands = match unsafe { CStr::from_ptr(raw_commands).to_str() } {
@@ -185,6 +190,7 @@ impl PluginManager {
                 param: empty,
                 author: empty,
                 color: color_ffi,
+                channel: empty,
             });
             let timers = match unsafe { CStr::from_ptr(raw_timers).to_str() } {
                 Ok(timers_str) => parse_timer_declarations(timers_str),

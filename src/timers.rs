@@ -165,12 +165,17 @@ fn run_timer_tick(
             Ok(author) => author.into_raw(),
             Err(_) => return,
         };
+        let cstr_channel = match CString::new("") {
+            Ok(channel) => channel.into_raw(),
+            Err(_) => return,
+        };
 
         let context = PluginContext {
             cmd: cstr_cmd,
             param: cstr_param,
             author: cstr_author,
             color: color_ffi,
+            channel: cstr_channel,
         };
 
         let raw_results = exported(&context);
@@ -184,6 +189,7 @@ fn run_timer_tick(
         };
 
         _ = CString::from_raw(raw_results);
+        _ = CString::from_raw(cstr_channel);
         _ = CString::from_raw(cstr_author);
         _ = CString::from_raw(cstr_param);
         _ = CString::from_raw(cstr_cmd);

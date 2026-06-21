@@ -246,12 +246,17 @@ async fn handle_messages(
                     Ok(author) => author.into_raw(),
                     Err(_) => return false,
                 };
+                let cstr_channel = match CString::new(target) {
+                    Ok(channel) => channel.into_raw(),
+                    Err(_) => return false,
+                };
 
                 let context: PluginContext = PluginContext {
                     cmd: cstr_cmd,
                     param: cstr_param,
                     author: cstr_author,
                     color: author.color,
+                    channel: cstr_channel,
                 };
 
                 let raw_results = exported(&context);
@@ -265,6 +270,7 @@ async fn handle_messages(
                 };
 
                 _ = CString::from_raw(raw_results);
+                _ = CString::from_raw(cstr_channel);
                 _ = CString::from_raw(cstr_author);
                 _ = CString::from_raw(cstr_param);
                 _ = CString::from_raw(cstr_cmd);
