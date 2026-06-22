@@ -160,6 +160,7 @@ async fn handle_incoming_message(
         respond_method,
         client,
         target,
+        response_target,
         &loaded_plugins,
         author,
         cmd,
@@ -172,6 +173,10 @@ async fn handle_messages(
     respond_method: fn(&Client, &str, &str) -> bool,
     client: &Client,
     target: &str,
+    // The channel the command originated in (used to scope per-channel plugin
+    // state). Distinct from `target`, which is where the reply is sent — for a
+    // `-` notice that's the nick, but the state still belongs to the channel.
+    channel: &str,
     loaded_plugins: &Vec<Plugin>,
     author: Author,
     cmd: &str,
@@ -246,7 +251,7 @@ async fn handle_messages(
                     Ok(author) => author.into_raw(),
                     Err(_) => return false,
                 };
-                let cstr_channel = match CString::new(target) {
+                let cstr_channel = match CString::new(channel) {
                     Ok(channel) => channel.into_raw(),
                     Err(_) => return false,
                 };
