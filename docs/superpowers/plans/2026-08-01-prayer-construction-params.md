@@ -754,6 +754,8 @@ def write_report(path: pathlib.Path, section: str, buckets: dict, skipped: list[
 
 
 def main():
+    import json
+
     ini_text = INI_PATH.read_text(encoding="utf-8")
 
     print("gathering Prayer...", file=sys.stderr)
@@ -763,6 +765,9 @@ def main():
         "Prayer",
         reconcile.reconcile(reconcile.read_section(ini_text, "Prayer"), prayer),
         prayer_skipped,
+    )
+    (HERE / "wiki-prayer-keys.json").write_text(
+        json.dumps(sorted(prayer), indent=1), encoding="utf-8"
     )
 
     print("gathering Construction...", file=sys.stderr)
@@ -774,6 +779,9 @@ def main():
             reconcile.read_section(ini_text, "Construction"), construction
         ),
         construction_skipped,
+    )
+    (HERE / "wiki-construction-keys.json").write_text(
+        json.dumps(sorted(construction), indent=1), encoding="utf-8"
     )
 
 
@@ -868,11 +876,29 @@ assert not [r for r in rows if not re.fullmatch(r'\d+(\.\d+)?', r.split('=',1)[1
 low = [k.lower() for k in keys]
 assert len(low) == len(set(low)), 'duplicate key: %s' % [k for k in low if low.count(k) > 1]
 assert not [k for k in keys if 'ectofunctus' in k.lower()], 'old Ectofunctus spelling remains'
-print('Prayer section clean')
+
+# Exactly four altar/ectofuntus pairs, and each is a multiple of its base.
+values = {k.lower(): float(r.split('=',1)[1]) for k, r in zip(keys, rows)}
+gilded = [k for k in keys if k.lower().endswith('_(gilded_altar)')]
+ecto = [k for k in keys if k.lower().endswith('_(ectofuntus)')]
+assert len(gilded) == 4, 'expected 4 gilded altar rows, got %s' % gilded
+assert len(ecto) == 4, 'expected 4 ectofuntus rows, got %s' % ecto
+for k in gilded + ecto:
+    base = k.lower().rsplit('_(', 1)[0]
+    assert base in values, 'variant %s has no base entry %s' % (k, base)
+    mult = 3.5 if k in gilded else 4.0
+    want = values[base] * mult
+    got = values[k.lower()]
+    assert abs(got - want) < 0.01, '%s=%s should be %s x %s = %s' % (
+        k, got, values[base], mult, want)
+
+print('Prayer section clean:', len(rows), 'entries')
 EOF
 ```
 
-Expected: `Prayer section clean` and an entry count printed.
+Expected: `Prayer section clean: N entries`. The multiplier assertion is the
+mechanical proof of the "verify their multipliers" requirement — if a base value
+changed, its two variants must move with it.
 
 - [ ] **Step 4: Verify the real `ini` crate still parses the file**
 
@@ -1078,18 +1104,33 @@ print('entries:', len(rows))
 assert all('=' in r for r in rows), [r for r in rows if '=' not in r]
 assert not [r for r in rows if r.endswith('=')], 'empty value'
 assert not [k for k in keys if ' ' in k], 'literal space in key: %s' % [k for k in keys if ' ' in k]
-assert not [k for k in keys if '-' in k], 'hyphen in key: %s' % [k for k in keys if '-' in k]
 assert not [r for r in rows if not re.fullmatch(r'\d+(\.\d+)?', r.split('=',1)[1])], 'non-numeric'
 low = [k.lower() for k in keys]
 assert len(low) == len(set(low)), 'duplicate key: %s' % [k for k in low if low.count(k) > 1]
 assert keys == sorted(keys, key=str.lower), 'not sorted'
-print('Construction section clean')
+
+# Every key must be a real wiki name, or a hand-kept entry you justified in
+# Step 1. This is what proves the hyphens are gone: `Marble_cape-rack` is not
+# a wiki name, while `Anti-dragon_shield` legitimately is.
+import json, pathlib
+wiki = set(json.loads(pathlib.Path(
+    '/home/rohara/.claude/jobs/5422e5c0/tmp/wikitool/wiki-construction-keys.json'
+).read_text()))
+KEPT = {
+    # Hand-kept entries with no Infobox Construction page. Fill this in from
+    # your Step 1 dispositions, one comment per entry saying what it is and
+    # which wiki page you verified it against. An entry with no justification
+    # does not belong here -- drop it instead.
+}
+stray = [k for k in keys if k not in wiki and k not in KEPT]
+assert not stray, 'keys that are neither wiki names nor justified: %s' % stray
+print('Construction section clean:', len(rows), 'entries')
 EOF
 ```
 
-Expected: `Construction section clean`.
+Expected: `Construction section clean: N entries`.
 
-Note the hyphen assertion is strict: no key may contain `-` at all. If a genuine wiki item name contains a hyphen (check the report before assuming), relax the assertion for that specific key and record why in the commit body.
+The `KEPT` allowlist is the mechanical counterpart to the Step 1 dispositions — anything you decided to keep that the wiki templates do not cover goes there with a comment naming the page you checked. If `stray` is non-empty and the key is not something you consciously kept, it is a typo you introduced; fix the key rather than widening the allowlist.
 
 - [ ] **Step 5: Verify the real `ini` crate still parses the file**
 
