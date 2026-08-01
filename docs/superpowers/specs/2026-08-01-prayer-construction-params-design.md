@@ -172,9 +172,15 @@ would cut across it.
 - Re-run the mechanical fault scan over both sections: no empty values, no
   literal spaces in keys, no non-numeric values, no duplicate keys under
   case-insensitive comparison.
-- `cargo test -p reinze-lib-runescape` passes.
-- The INI still parses: load it through the same `ini` crate the bot uses and
-  confirm both sections read back with the expected entry counts.
+- The INI still parses: load it through the same `ini` crate the bot uses
+  (`rust-ini 0.21`) and confirm both sections read back with the expected entry
+  counts. `rust-reinze` has no cargo dependency on `reinze-lib-runescape` —
+  plugins load at runtime as `.so` files — so this runs as a throwaway
+  `examples/ini_smoke.rs` inside `reinze-lib-runescape`, which is where the
+  crate is. It is deleted immediately after, leaving that repo clean.
+- `cargo test` inside `reinze-lib-runescape` passes. Note this proves nothing
+  about the data: both `params.rs` tests return before `Ini::load_from_file` by
+  design. The INI check above is the one that matters.
 - Spot-check a sample of changed values against their rendered wiki pages.
 
 ## Deliverable
