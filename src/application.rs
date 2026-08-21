@@ -122,7 +122,10 @@ async fn handle_incoming_message(
         None => return true,
     };
 
-    let re = Regex::new(r"^([-+])([a-zA-Z\d-]+)(?:\s+(.*))?$").unwrap();
+    // `%` is a command character, not just punctuation: `+cmb%` and `+cmb%5`
+    // are real commands. Without it here the whole message fails to match and
+    // is dropped before any plugin sees it.
+    let re = Regex::new(r"^([-+])([a-zA-Z\d%-]+)(?:\s+(.*))?$").unwrap();
     let matched = match re.captures(msg) {
         Some(matched) => vec![matched],
         None => vec![],
