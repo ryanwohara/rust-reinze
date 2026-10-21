@@ -10,13 +10,14 @@ extern crate select;
 use common::author::cache::{color_ffi, init};
 use std::fs::read_dir;
 use std::path::Path;
+use std::time::Duration;
 use tokio;
-use tokio::task::JoinHandle;
+use tokio::time;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     env_logger::init();
-    let mut threads = vec![];
+    let mut networks = vec![];
     init();
 
     for entry in read_dir(Path::new("conf/")).unwrap() {
@@ -24,38 +25,26 @@ async fn main() {
         let str = path.to_str().unwrap().to_string();
 
         if path.is_file() && str.ends_with(".toml") {
-            let string = str.to_string();
-            let thread =
-                tokio::spawn(async move { application::run(&str.to_owned(), color_ffi).await });
-            threads.push(Thread { thread, string });
+            networks.push(tokio::spawn(supervise(str)));
         }
     }
 
-    loop {
-        let container = threads
-            .iter()
-            .map(|thread| {
-                if thread.thread.is_finished() {
-                    Some(thread.string.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<Option<String>>>();
-        threads.retain(|thread| thread.thread.is_finished());
-        container.iter().for_each(|str| {
-            if str.is_some() {
-                let string = str.as_ref().unwrap().to_string();
-                threads.push(Thread {
-                    string: string.to_string(),
-                    thread: tokio::spawn(async move { application::run(string, color_ffi).await }),
-                })
-            }
-        });
+    for network in networks {
+        network.await.ok();
     }
 }
 
-struct Thread {
-    string: String,
-    thread: JoinHandle<()>,
+// `run` only returns by panicking; restart it so one network's crash doesn't
+// leave that network offline while the others keep running.
+async fn supervise(path: String) {
+    loop {
+        let path = path.clone();
+        let handle = tokio::spawn(async move { application::run(path, color_ffi).await });
+
+        if let Err(e) = handle.await {
+            eprintln!("Client task ended ({}), restarting in 5 secs...", e);
+        }
+
+        time::sleep(Duration::from_secs(5)).await;
+    }
 }

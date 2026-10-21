@@ -19,6 +19,8 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
 
+const MAX_RETRY_SECS: u64 = 300;
+
 pub async fn run<T>(path: T, color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult)
 where
     T: ToString,
@@ -54,7 +56,7 @@ where
         );
 
         time::sleep(Duration::from_secs(interval)).await;
-        interval = 2 * interval;
+        interval = (2 * interval).min(MAX_RETRY_SECS);
     }
 }
 
@@ -64,9 +66,27 @@ async fn run_client(
     timer_manager: Arc<TimerManager>,
     color_ffi: extern "C" fn(*const c_char, *const c_char) -> ColorResult,
 ) {
-    let mut client = Client::from_config(config.to_owned()).await.unwrap();
-    client.identify().unwrap();
-    let mut stream = client.stream().unwrap();
+    // A failed connect (DNS, refused, TLS handshake cut off mid-flight) is just
+    // another disconnect: return and let `run` back off and retry. Panicking
+    // here would take this network's task down for good.
+    let mut client = match Client::from_config(config.to_owned()).await {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("Connection failed: {}", e);
+            return;
+        }
+    };
+    if let Err(e) = client.identify() {
+        eprintln!("Identify failed: {}", e);
+        return;
+    }
+    let mut stream = match client.stream() {
+        Ok(stream) => stream,
+        Err(e) => {
+            eprintln!("Stream failed: {}", e);
+            return;
+        }
+    };
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
