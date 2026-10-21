@@ -28,17 +28,24 @@ where
     let config = Config::load(path.to_string()).unwrap();
     let mut interval = 1;
 
+    // One plugin manager and watcher per network, shared across reconnects.
+    // Building them inside the loop leaked a watcher thread every disconnect.
+    let plugin_manager = PluginManager::new(color_ffi);
+    plugin_manager
+        .timer_manager
+        .set_runtime(tokio::runtime::Handle::current());
+    plugin_manager.reload().unwrap();
+
+    let active_ref = plugin_manager.active.clone();
+    let timer_manager = plugin_manager.timer_manager.clone();
+
+    thread::spawn(move || plugin_manager.watch());
+
     loop {
-        let plugin_manager = PluginManager::new(color_ffi);
-        plugin_manager
-            .timer_manager
-            .set_runtime(tokio::runtime::Handle::current());
-        plugin_manager.reload().unwrap();
-
-        let active_ref = plugin_manager.active.clone();
-        let timer_manager = plugin_manager.timer_manager.clone();
-
-        thread::spawn(move || plugin_manager.watch());
+        let active_ref = active_ref.clone();
+        let timer_manager = timer_manager.clone();
+        // run_client cancels timers on disconnect; bring them back for this connection.
+        timer_manager.restart(&active_ref);
 
         let before = time::Instant::now();
         run_client(&config, active_ref, timer_manager, color_ffi).await;
